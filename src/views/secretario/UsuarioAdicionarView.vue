@@ -15,11 +15,11 @@ const estado = ref(true)
 const fechaRegistro = ref('')
 
 onMounted(() => {
-    const ahora = new Date()
-    const yyyy = ahora.getFullYear()
-    const mm = String(ahora.getMonth() + 1).padStart(2, '0')
-    const dd = String(ahora.getDate()).padStart(2, '0')
-    fechaRegistro.value = `${yyyy}-${mm}-${dd}`
+	const ahora = new Date()
+	const yyyy = ahora.getFullYear()
+	const mm = String(ahora.getMonth() + 1).padStart(2, '0')
+	const dd = String(ahora.getDate()).padStart(2, '0')
+	fechaRegistro.value = `${yyyy}-${mm}-${dd}`
 })
 
 // Campos dependientes del rol

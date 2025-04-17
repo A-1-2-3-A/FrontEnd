@@ -22,11 +22,15 @@ import DTemaDetalleView from '@/views/director/TemaDetalleView.vue'
 import TPrincipalView from '@/views/tribunal/PrincipalView.vue'
 import TPerfilView from '@/views/tribunal/PerfilView.vue'
 import TTemaView from '@/views/tribunal/TemaView.vue'
+import TTemaGestionView from '@/views/tribunal/TemaGestionView.vue'
 
 import SPrincipalView from '@/views/secretario/PrincipalView.vue'
 import SPerfilView from '@/views/secretario/PerfilView.vue'
 import SUsuarioView from '@/views/secretario/UsuarioView.vue'
+import SUsuarioAdicionarView from '@/views/secretario/UsuarioAdicionarView.vue'
+import SUsuarioModificarView from '@/views/secretario/UsuarioModificarView.vue'
 import STemaView from '@/views/secretario/TemaView.vue'
+import STemaAdicionarView from '@/views/secretario/TemaAdicionarView.vue'
 
 import EPrincipalView from '@/views/estudiante/PrincipalView.vue'
 import EPerfilView from '@/views/estudiante/PerfilView.vue'
@@ -128,6 +132,12 @@ const router = createRouter({
                     name: 'TTemaView',
                     component: TTemaView,
                 },
+                {
+                    path: 'tema/:id/gestion',
+                    name: 'TTemaGestionView',
+                    component: TTemaGestionView,
+                    props: true,
+                },
             ],
         },
         {
@@ -150,9 +160,25 @@ const router = createRouter({
                     component: SUsuarioView,
                 },
                 {
+                    path: 'usuario/adicionar',
+                    name: 'SUsuarioAdicionarView',
+                    component: SUsuarioAdicionarView,
+                },
+                {
+                    path: 'usuario/:id/modificar',
+                    name: 'SUsuarioModificarView',
+                    component: SUsuarioModificarView,
+                    props: true,
+                },
+                {
                     path: 'tema',
                     name: 'STemaView',
                     component: STemaView,
+                },
+                {
+                    path: 'tema/adicionar',
+                    name: 'STemaAdicionarView',
+                    component: STemaAdicionarView,
                 },
             ],
         },

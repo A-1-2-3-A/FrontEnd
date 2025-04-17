@@ -8,7 +8,7 @@
 
         <div class="flex-grow-1 text-center">
             <h5 class="m-0 fw-bold">ING. SISTEMAS - ING. INFORMATICA</h5>
-            <small>ADMINISTRACION DE PERFILES</small>
+            <small>ADMINISTRACION DE TEMAS</small>
         </div>
 
         <div class="button-container">

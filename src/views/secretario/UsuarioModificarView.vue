@@ -1,39 +1,31 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { usuarios } from '@/data/usuarios.js'
 
-// Campos del formulario
-const usuario = ref('')
-const clave = ref('')
-const repetirClave = ref('')
-const nombres = ref('')
-const primerApellido = ref('')
-const segundoApellido = ref('')
-const rol = ref('')
-const estado = ref(true)
+const route = useRoute()
+const idUsuario = parseInt(route.params.id)
+const usuarioData = usuarios.find(u => u.idUsuario === idUsuario)
 
-// Fecha con GMT-4
-const fechaRegistro = ref('')
+const usuario = ref(usuarioData?.usuario || '')
+const nombres = ref(usuarioData?.nombres || '')
+const primerApellido = ref(usuarioData?.primer_apellido || '')
+const segundoApellido = ref(usuarioData?.segundo_apellido || '')
+const rol = ref(usuarioData?.rol || '')
+const fechaRegistro = ref(usuarioData?.fecRegistro || new Date().toISOString().split('T')[0])
+const estado = ref(usuarioData?.estado ?? true)
 
-onMounted(() => {
-    const ahora = new Date()
-    const yyyy = ahora.getFullYear()
-    const mm = String(ahora.getMonth() + 1).padStart(2, '0')
-    const dd = String(ahora.getDate()).padStart(2, '0')
-    fechaRegistro.value = `${yyyy}-${mm}-${dd}`
-})
-
-// Campos dependientes del rol
-const gestion = ref('')
-const especialidad = ref('')
-const tipo = ref('')
-const anioEntrada = ref('')
+const gestion = ref(usuarioData?.gestion || '')
+const especialidad = ref(usuarioData?.especialidad || '')
+const tipo = ref(usuarioData?.tipo || '')
+const anioEntrada = ref(usuarioData?.anioEntrada || '')
 </script>
 
 <template>
     <section class="container mt-4 d-flex flex-column align-items-center">
         <div class="card shadow w-100" style="max-width: 600px;">
             <div class="card-header bg-primary text-white fw-bold">
-                Agregar nuevo usuario
+                Modificar usuario
             </div>
 
             <div class="card-body">
@@ -51,25 +43,16 @@ const anioEntrada = ref('')
                     <input type="text" v-model="segundoApellido" class="form-control" />
                 </div>
 
-                <!-- Usuario y contraseña -->
+                <!-- Usuario -->
                 <div class="mb-3">
                     <label class="form-label text-start w-100">Correo electrónico</label>
-                    <input type="email" v-model="usuario" class="form-control" placeholder="usuario@sistemas.edu.bo" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Contraseña</label>
-                    <input type="password" v-model="clave" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Repetir contraseña</label>
-                    <input type="password" v-model="repetirClave" class="form-control" />
+                    <input type="email" v-model="usuario" class="form-control" placeholder="usuario@sistemas.edu.bo" disabled />
                 </div>
 
                 <!-- Rol -->
                 <div class="mb-3">
                     <label class="form-label text-start w-100">Rol</label>
                     <select v-model="rol" class="form-select">
-                        <option value="" disabled>Seleccione un rol</option>
                         <option value="director">Director</option>
                         <option value="tribunal">Tribunal</option>
                         <option value="secretario">Secretario</option>
@@ -104,15 +87,15 @@ const anioEntrada = ref('')
                     <input type="number" v-model="anioEntrada" class="form-control" placeholder="2020" />
                 </div>
 
-                <!-- Fecha (readonly, no editable) -->
+                <!-- Fecha -->
                 <div class="mb-3">
                     <label class="form-label text-start w-100">Fecha de registro</label>
-                    <input type="date" class="form-control" :value="fechaRegistro" readonly />
+                    <input type="date" v-model="fechaRegistro" class="form-control" />
                 </div>
 
                 <!-- Botón guardar -->
                 <div class="text-center mt-4">
-                    <button class="btn btn-success px-4">Guardar usuario</button>
+                    <button class="btn btn-success px-4">Guardar cambios</button>
                 </div>
             </div>
         </div>
