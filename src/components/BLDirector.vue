@@ -1,52 +1,33 @@
 <script setup>
-
-
 </script>
 
 <template>
     <div class="sidebar d-flex flex-column">
         <nav class="nav flex-column mt-3">
-            <router-link
-                :to="{ name: 'DPrincipalView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Inicio
+            <router-link :to="{ name: 'DPrincipalView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
+                <i class="bi bi-grid-1x2-fill me-2"></i> Inicio
             </router-link>
-            <router-link
-                :to="{ name: 'DPerfilView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Ver Perfil
+            <router-link :to="{ name: 'DPerfilView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
+                <i class="bi bi-person-circle me-2"></i> Ver Perfil
             </router-link>
-            <router-link
-                :to="{ name: 'DUsuarioView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Usuarios
+            <router-link :to="{ name: 'DUsuarioView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
+                <i class="bi bi-people-fill me-2"></i> Usuarios
             </router-link>
-            <router-link
-                :to="{ name: 'DTribunalView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Tribunales
+            <router-link :to="{ name: 'DTribunalView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
+                <i class="bi bi-person-workspace me-2"></i> Tribunales
             </router-link>
-            <router-link
-                :to="{ name: 'DTemaView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Temas
+            <router-link :to="{ name: 'DTemaView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
+                <i class="bi bi-collection-fill me-2"></i> Temas
             </router-link>
-            <router-link
-                :to="{ name: 'PublicView' }"
-                class="nav-link text-white d-flex align-items-center px-3 py-2"
-            >
-                <i class="bi bi-house me-2"></i> Salir
+            <router-link :to="{ name: 'PublicView' }" class="nav-link text-white d-flex align-items-center px-3 py-2 mt-auto mb-2">
+                <i class="bi bi-box-arrow-left me-2"></i> Salir
             </router-link>
         </nav>
     </div>
 </template>
 
 <style scoped>
+/* (El estilo se mantiene igual, pero he añadido esto para el botón de salir) */
 .sidebar {
     width: 250px;
     background-color: #1a1c1e;
@@ -55,25 +36,17 @@
     flex-direction: column;
     min-height: 100%;
 }
-
-.sidebar-header {
-    background-color: #0d6efd;
-    border-bottom: 1px solid #0a58ca;
-}
-
 .nav-link {
     color: white;
     text-decoration: none;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
+    font-size: 1rem; /* Aumentamos ligeramente el tamaño para mejor legibilidad */
+    transition: background-color 0.2s ease;
 }
-
 .nav-link:hover {
-    background-color: #0a58ca;
+    background-color: #0d6efd;
     color: white;
 }
-
 .nav-link i {
-    font-size: 18px;
+    font-size: 1.2rem; /* Iconos un poco más grandes */
 }
 </style>

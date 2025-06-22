@@ -1,127 +1,190 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { temas } from '@/data/temas.js'
-import { usuarios } from '@/data/usuarios.js'
-import { asignacionTribunal } from '@/data/asignacionTribunal.js'
+import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
+import { temas } from '@/data/temas.js';
+import { usuarios } from '@/data/usuarios.js';
+import { historialRevisiones } from '@/data/historialRevisiones.js';
+import { useAuthStore } from '@/stores/auth'; 
+import axios from 'axios';
 
-const route = useRoute()
-const temaId = parseInt(route.params.id)
+const route = useRoute();
+const temaId = parseInt(route.params.id);
+const authStore = useAuthStore();
 
-const tema = ref(null)
-const estudiante = ref(null)
-const tribunalesAsignados = ref([])
+// --- ESTADO DEL COMPONENTE ---
+const tema = ref(null);
+const estudiante = ref(null);
+const revisionesTribunales = ref([]);
+const estadoGeneralTema = ref('Calculando...');
+const historialVisiblePara = ref(null);
 
-const claseEstadoTema = (estado) => {
-    switch (estado) {
-        case 'aprobado': return 'badge bg-success'
-        case 'reprobado': return 'badge bg-danger'
-        case 'pendiente': return 'badge bg-warning text-dark'
-        case 'preliminar': return 'badge bg-secondary'
-        default: return 'badge bg-light text-dark'
-    }
-}
-
-const claseVeredicto = (veredicto) => {
-    switch (veredicto?.toLowerCase()) {
-        case 'aprobado': return 'badge bg-success'
-        case 'reprobado': return 'badge bg-danger'
-        case 'aprobado con observaciones': return 'badge bg-warning text-dark'
-        default: return 'badge bg-secondary'
-    }
-}
-
+// --- LÓGICA AL MONTAR EL COMPONENTE ---
 onMounted(() => {
-    tema.value = temas.find(t => t.idTema === temaId)
+    tema.value = temas.find(t => t.idTema === temaId);
+    if (!tema.value) return;
 
-    if (tema.value) {
-        estudiante.value = usuarios.find(u => u.idUsuario === tema.value.idEstudiante)
-    }
+    estudiante.value = usuarios.find(u => u.idUsuario === tema.value.idEstudiante);
 
-    const asignaciones = asignacionTribunal.filter(a => a.idTema === temaId)
+    const historialesDelTema = historialRevisiones.filter(h => h.idTema === temaId);
 
-    tribunalesAsignados.value = asignaciones.map(a => {
-        const tribunal = usuarios.find(u => u.idUsuario === a.idTribunal)
+    revisionesTribunales.value = historialesDelTema.map(historial => {
+        const tribunalInfo = usuarios.find(u => u.idUsuario === historial.idTribunal);
+        const ultimaRevision = historial.revisiones[historial.revisiones.length - 1];
         return {
-            nombreCompleto: `${tribunal.primer_apellido} ${tribunal.segundo_apellido}, ${tribunal.nombres}`,
-            especialidad: tribunal.especialidad,
-            veredicto: a.veredicto || 'pendiente'
-        }
-    })
-})
+            idTribunal: tribunalInfo.idUsuario,
+            nombreCompleto: `${tribunalInfo.nombres} ${tribunalInfo.primer_apellido}`,
+            veredictoActual: ultimaRevision.veredicto,
+            fechaUltimoVeredicto: ultimaRevision.fecha_veredicto,
+            historialCompleto: historial.revisiones
+        };
+    });
+
+    const veredictosActuales = revisionesTribunales.value.map(t => t.veredictoActual);
+    if (veredictosActuales.includes('REPROBADO')) {
+        estadoGeneralTema.value = 'REPROBADO';
+    } else if (veredictosActuales.includes('REVISADO')) {
+        estadoGeneralTema.value = 'REVISADO';
+    } else if (veredictosActuales.every(v => v === 'APROBADO')) {
+        estadoGeneralTema.value = 'APROBADO';
+    } else {
+        estadoGeneralTema.value = 'PENDIENTE';
+    }
+});
+
+// --- FUNCIONES ---
+function toggleHistorial(idTribunal) {
+    historialVisiblePara.value = historialVisiblePara.value === idTribunal ? null : idTribunal;
+}
+
+async function descargarArchivo(ruta, nombreArchivo) {
+    try {
+        const response = await axios.get(`http://localhost:3000/archivos/descargar?ruta=${ruta}`, {
+            headers: { 'Authorization': `Bearer ${authStore.token}` },
+            responseType: 'blob',
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', nombreArchivo);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Error al descargar el archivo:', error);
+        alert('No se pudo descargar el archivo.');
+    }
+}
+
+
+const getVeredictoClass = (veredicto) => {
+    switch (veredicto) {
+        case 'APROBADO': return 'bg-success';
+        case 'REPROBADO': return 'bg-danger';
+        case 'REVISADO': return 'bg-warning text-dark';
+        default: return 'bg-secondary';
+    }
+};
+
+const formatearFecha = (fecha) => {
+    if (!fecha) return '---';
+    return new Date(fecha).toLocaleDateString('es-ES');
+};
 </script>
 
 <template>
     <section class="container mt-4">
-        <h2 class="fw-bold mb-4 text-center">Detalle del Tema</h2>
+        <div v-if="tema">
+            <h2 class="fw-bold text-center mb-4">Detalle y Seguimiento del Tema</h2>
 
-        <!-- Información del tema -->
-        <div class="card shadow mb-4">
-            <div class="card-header bg-primary text-white fw-bold text-uppercase">
-                Información del Tema
-            </div>
-            <div class="card-body px-4 py-4">
-                <div class="row mb-3">
-                    <div class="col-md-6 mb-3">
-                        <label class="fw-semibold text-muted">Nombre del tema</label>
-                        <div class="border rounded p-2 bg-light text-dark">
-                            {{ tema?.nombre || 'Sin información' }}
+            <!-- Panel de Información General -->
+            <div class="card shadow-sm mb-4">
+                 <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="card-title fw-bold">{{ tema.nombre }}</h5>
+                            <p class="card-text text-muted mb-0">Estudiante: {{ estudiante?.nombres }} {{ estudiante?.primer_apellido }}</p>
                         </div>
-                    </div>
-                    <div class="col-md-6 mb-3 text-center">
-                        <label class="fw-semibold text-muted d-block">Estado del tema</label>
-                        <div class="d-flex justify-content-center">
-                            <span :class="['badge', 'px-3', 'py-2', claseEstadoTema(tema?.estado)]">
-                                {{ tema?.estado?.toUpperCase() || 'SIN ESTADO' }}
-                            </span>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="row">
-                    <div class="col-md-12">
-                        <label class="fw-semibold text-muted">Estudiante responsable</label>
-                        <div class="border rounded p-2 bg-light text-dark">
-                            {{ estudiante
-                                ? `${estudiante.primer_apellido} ${estudiante.segundo_apellido}, ${estudiante.nombres}`
-                                : 'No asignado' }}
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <h6 class="text-muted mb-1">Estado General del Tema</h6>
+                            <span class="badge fs-6 px-3 py-2" :class="getVeredictoClass(estadoGeneralTema)">{{ estadoGeneralTema }}</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Tribunal asignado -->
-        <div class="card shadow">
-            <div class="card-header bg-secondary text-white fw-bold">Tribunales Asignados</div>
-            <div class="card-body px-4 py-3">
-                <div v-if="tribunalesAsignados.length > 0" class="table-responsive">
-                    <table class="table table-bordered table-striped align-middle">
-                        <thead class="table-dark text-center">
+            <!-- Panel de Monitoreo de Revisiones -->
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold bg-dark text-white">Monitoreo de Revisiones por Tribunal</div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="text-center">
                             <tr>
-                                <th>Nombre completo</th>
-                                <th>Especialidad</th>
-                                <th>Veredicto</th>
+                                <th>Tribunal</th>
+                                <th>Último Veredicto</th>
+                                <th>Fecha</th>
+                                <th>Trazabilidad</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="(t, i) in tribunalesAsignados" :key="i" class="text-center">
-                                <td>{{ t.nombreCompleto }}</td>
-                                <td>{{ t.especialidad }}</td>
-                                <td>
-                                    <span :class="claseVeredicto(t.veredicto)">
-                                        {{ t.veredicto.toUpperCase() }}
-                                    </span>
-                                </td>
-                            </tr>
+                        <tbody class="text-center align-middle">
+                            <template v-for="revision in revisionesTribunales" :key="revision.idTribunal">
+                                <tr>
+                                    <td>{{ revision.nombreCompleto }}</td>
+                                    <td><span class="badge" :class="getVeredictoClass(revision.veredictoActual)">{{ revision.veredictoActual }}</span></td>
+                                    <td>{{ formatearFecha(revision.fechaUltimoVeredicto) }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" @click="toggleHistorial(revision.idTribunal)">
+                                            <i class="bi bi-clock-history"></i> Ver Historial
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- FILA DE HISTORIAL DESPLEGABLE CON ARCHIVO MEJORADO -->
+                                <tr v-if="historialVisiblePara === revision.idTribunal">
+                                    <td colspan="4" class="p-3 bg-light">
+                                        <h6 class="fw-bold">Historial de Revisiones para {{ revision.nombreCompleto }}:</h6>
+                                        <ul class="list-group">
+                                            <li v-for="h in revision.historialCompleto" :key="h.version" class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <strong>Versión #{{ h.version }}:</strong> Veredicto de "{{ h.veredicto }}"
+                                                        <br>
+                                                        <!-- **MODIFICACIÓN AQUÍ** -->
+                                                        <small class="text-muted">
+                                                            Archivo Revisado: 
+                                                            <a href="#" @click.prevent="descargarArchivo(h.documentoRevisado.ruta, h.documentoRevisado.nombre)" class="file-download-link">
+                                                                {{ h.documentoRevisado.nombre }}
+                                                            </a>
+                                                        </small>
+                                                    </div>
+                                                    <span class="text-muted">{{ formatearFecha(h.fecha_veredicto) }}</span>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
-                </div>
-                <div v-else class="alert alert-warning text-center">
-                    Este tema aún no tiene tribunales asignados.
                 </div>
             </div>
         </div>
     </section>
 </template>
+
+<style scoped>
+/* Estilo para el enlace de descarga personalizado */
+.file-download-link {
+    color: inherit; /* Hereda el color de .text-muted */
+    text-decoration: none; /* Sin subrayado por defecto */
+    cursor: pointer;
+    font-weight: 500; /* Ligeramente más grueso para destacar */
+    transition: color 0.2s;
+}
+
+.file-download-link:hover {
+    color: #0d6efd; /* Cambia a color primario al pasar el mouse */
+    text-decoration: underline; /* Subrayado solo en hover */
+}
+</style>

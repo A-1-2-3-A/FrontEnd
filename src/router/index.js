@@ -7,6 +7,8 @@ import EstudianteLayout from '@/layouts/EstudianteLayout.vue'
 
 import PublicView from '@/views/PublicView.vue'
 import LoginView from '@/views/LoginView.vue'
+import TribunalView from '@/views/TribunalView.vue'
+import TemaView from '@/views/TemaView.vue'
 
 import DPrincipalView from '@/views/director/PrincipalView.vue'
 import DPerfilView from '@/views/director/PerfilView.vue'
@@ -31,10 +33,16 @@ import SUsuarioAdicionarView from '@/views/secretario/UsuarioAdicionarView.vue'
 import SUsuarioModificarView from '@/views/secretario/UsuarioModificarView.vue'
 import STemaView from '@/views/secretario/TemaView.vue'
 import STemaAdicionarView from '@/views/secretario/TemaAdicionarView.vue'
+import STemaModificarView from '@/views/secretario/TemaModificarView.vue'
+
 
 import EPrincipalView from '@/views/estudiante/PrincipalView.vue'
 import EPerfilView from '@/views/estudiante/PerfilView.vue'
 import ETemaView from '@/views/estudiante/TemaView.vue'
+import ETemaGestionView from '@/views/estudiante/TemaGestionView.vue'
+import ETemaTribunalView from '@/views/estudiante/TemaTribunalView.vue'
+
+// import { getUsuarioActual } from '@/utils/auth.js' // Ya no se necesita para la revisión
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
@@ -53,6 +61,16 @@ const router = createRouter({
                     name: 'LoginView',
                     component: LoginView,
                 },
+                {
+                    path: 'tribunales', // URL más limpia
+                    name: 'TribunalView',
+                    component: TribunalView,
+                },
+                {
+                    path: 'temas', // URL más limpia
+                    name: 'TemaView',
+                    component: TemaView,
+                }
             ],
         },
         {
@@ -70,46 +88,47 @@ const router = createRouter({
                     component: DPerfilView,
                 },
                 {
-                    path: 'usuario',
+                    path: 'usuarios', // URL más limpia
                     name: 'DUsuarioView',
                     component: DUsuarioView,
                 },
                 {
-                    path: 'usuario/adicionar',
+                    path: 'usuarios/adicionar', // URL más limpia
                     name: 'DUsuarioAdicionarView',
                     component: DUsuarioAdicionarView,
                 },
                 {
-                    path: 'usuario/:id/modificar',
+                    path: 'usuarios/:id/modificar', // URL más limpia
                     name: 'DUsuarioModificarView',
                     component: DUsuarioModificarView,
                     props: true,
                 },
                 {
-                    path: 'tribunal',
+                    path: 'tribunales', // URL más limpia
                     name: 'DTribunalView',
                     component: DTribunalView,
                 },
                 {
-                    path: 'tribunal/designar',
+                    path: 'tribunales/designar', // URL más limpia
                     name: 'DDesTribunalView',
                     component: DDesTribunalView,
                 },
                 {
-                    path: 'tribunal/:id/detalle',
+                    path: 'tribunales/:id/detalle', // URL más limpia
                     name: 'DTribunalDetalleView',
                     component: DTribunalDetalleView,
                     props: true,
-                }, 
+                },
                 {
-                    path: 'tema',
+                    path: 'temas', // URL más limpia
                     name: 'DTemaView',
                     component: DTemaView,
                 },
                 {
-                    path: 'tema/:id/detalle',
+                    path: 'temas/:id/detalle', // URL más limpia
                     name: 'DTemaDetalleView',
                     component: DTemaDetalleView,
+                    props: true
                 },
             ],
         },
@@ -128,12 +147,12 @@ const router = createRouter({
                     component: TPerfilView,
                 },
                 {
-                    path: 'tema',
+                    path: 'temas', // URL más limpia
                     name: 'TTemaView',
                     component: TTemaView,
                 },
                 {
-                    path: 'tema/:id/gestion',
+                    path: 'temas/:id/gestion', // URL más limpia
                     name: 'TTemaGestionView',
                     component: TTemaGestionView,
                     props: true,
@@ -155,30 +174,36 @@ const router = createRouter({
                     component: SPerfilView,
                 },
                 {
-                    path: 'usuario',
+                    path: 'usuarios', // URL más limpia
                     name: 'SUsuarioView',
                     component: SUsuarioView,
                 },
                 {
-                    path: 'usuario/adicionar',
+                    path: 'usuarios/adicionar', // URL más limpia
                     name: 'SUsuarioAdicionarView',
                     component: SUsuarioAdicionarView,
                 },
                 {
-                    path: 'usuario/:id/modificar',
+                    path: 'usuarios/:id/modificar', // URL más limpia
                     name: 'SUsuarioModificarView',
                     component: SUsuarioModificarView,
                     props: true,
                 },
                 {
-                    path: 'tema',
+                    path: 'temas', // URL más limpia
                     name: 'STemaView',
                     component: STemaView,
                 },
                 {
-                    path: 'tema/adicionar',
+                    path: 'temas/adicionar', // URL más limpia
                     name: 'STemaAdicionarView',
                     component: STemaAdicionarView,
+                },
+                {
+                    path: 'temas/:id/modificar', // URL más limpia
+                    name: 'STemaModificarView',
+                    component: STemaModificarView,
+                    props: true
                 },
             ],
         },
@@ -197,13 +222,37 @@ const router = createRouter({
                     component: EPerfilView,
                 },
                 {
-                    path: 'tema',
+                    path: 'temas', // URL más limpia
                     name: 'ETemaView',
                     component: ETemaView,
                 },
+                {
+                    path: 'temas/:id/gestion', // URL más limpia
+                    name: 'ETemaGestionView',
+                    component: ETemaGestionView,
+                    props: true,
+                },
+                {
+                    path: 'temas/:temaId/tribunal/:id', // URL más limpia
+                    name: 'ETemaTribunalView',
+                    component: ETemaTribunalView,
+                    props: true,
+                }
             ],
         },
     ],
 })
+
+// --- LÓGICA DE AUTENTICACIÓN DESACTIVADA TEMPORALMENTE ---
+// router.beforeEach((to, from, next) => {
+//     const rutasPublicas = ['PublicView', 'LoginView', 'TribunalView', 'TemaView']
+//     const usuario = getUsuarioActual()
+
+//     if (!rutasPublicas.includes(to.name) && !usuario) {
+//         next({ name: 'LoginView' })
+//     } else {
+//         next()
+//     }
+// })
 
 export default router

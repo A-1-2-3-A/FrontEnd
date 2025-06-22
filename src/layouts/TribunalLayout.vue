@@ -5,32 +5,28 @@ import BLTribunal from '../components/BLTribunal.vue';
 </script>
 
 <template>
-    <div class="d-flex flex-column min-vh-100 layout-wrapper">
+    <div class="d-flex flex-column min-vh-100">
         <Header />
-
         <div class="d-flex flex-grow-1 w-100">
             <aside class="sidebar bg-dark text-white">
                 <BLTribunal />
             </aside>
-
-            <main class="flex-grow-1 p-4 bg-light">
-                <RouterView />
-            </main>
+            <div class="main-content-wrapper flex-grow-1">
+                <main class="p-4 bg-light">
+                    <RouterView />
+                </main>
+            </div>
         </div>
-
         <Footer />
     </div>
 </template>
 
 <style scoped>
-.layout-wrapper {
-    width: 100%;
-    overflow-x: hidden;
-}
-
 .sidebar {
     width: 250px;
-    background-color: #1a1c1e;
-    color: white;
+    flex-shrink: 0;
+}
+.main-content-wrapper {
+    overflow-y: auto;
 }
 </style>

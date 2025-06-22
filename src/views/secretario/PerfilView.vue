@@ -1,58 +1,113 @@
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useAuthStore } from '@/stores/auth'; 
+import { usuarios } from '@/data/usuarios.js'; 
+
+const authStore = useAuthStore();
+const usuario = ref(null);
+
+const claveActual = ref('');
+const claveNueva = ref('');
+const repetirClaveNueva = ref('');
+
+onMounted(() => {
+    const usuarioLogueado = authStore.usuario;
+    if (usuarioLogueado) {
+        const detallesCompletos = usuarios.find(u => u.idUsuario === usuarioLogueado.id);
+        usuario.value = { ...usuarioLogueado, ...detallesCompletos };
+    }
+});
+
+function actualizarContrasena() {
+    if (!claveActual.value || !claveNueva.value || !repetirClaveNueva.value) {
+        alert("Todos los campos de contraseña son requeridos.");
+        return;
+    }
+    if (claveNueva.value !== repetirClaveNueva.value) {
+        alert("Las nuevas contraseñas no coinciden.");
+        return;
+    }
+    alert("Llamando a la API para actualizar la contraseña...");
+}
+</script>
+
 <template>
-	<section class="container mt-4 d-flex flex-column align-items-center">
+    <section class="container mt-4">
+        <div v-if="usuario" class="w-100" style="max-width: 600px; margin: auto;">
+            <!-- Recuadro Principal de Información -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white fw-bold text-center">
+                    Información del Perfil
+                </div>
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label">Nombres</label>
+                        <div class="form-control-plaintext-custom">{{ usuario.nombres }}</div>
+                    </div>
+                     <div class="mb-3">
+                        <label class="form-label">Apellidos</label>
+                        <div class="form-control-plaintext-custom">{{ usuario.primer_apellido }} {{ usuario.segundo_apellido }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Correo Electrónico</label>
+                        <div class="form-control-plaintext-custom bg-light">{{ usuario.usuario }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rol</label>
+                        <div class="form-control-plaintext-custom text-capitalize">{{ usuario.rol }}</div>
+                    </div>
+                    <div v-if="usuario.rol === 'tribunal' || usuario.rol === 'director'" class="mb-3">
+                        <label class="form-label">Especialidad</label>
+                        <div class="form-control-plaintext-custom">{{ usuario.especialidad || 'No asignada' }}</div>
+                    </div>
+                     <div v-if="usuario.rol === 'estudiante'" class="mb-3">
+                        <label class="form-label">Tipo de Estudiante</label>
+                        <div class="form-control-plaintext-custom text-capitalize">{{ usuario.tipo || 'No asignado' }}</div>
+                    </div>
+                </div>
+            </div>
 
-		<!-- Recuadro: Información del perfil - Secretario -->
-		<div class="card shadow mb-4 w-100" style="max-width: 600px;">
-			<div class="card-header bg-primary text-white fw-bold">
-				Información del perfil
-			</div>
-			<div class="card-body">
-				<div class="mb-3">
-					<label class="form-label text-start w-100">Nombres</label>
-					<input type="text" class="form-control" value="María Elena" disabled>
-				</div>
-				<div class="mb-3">
-					<label class="form-label text-start w-100">Apellidos</label>
-					<input type="text" class="form-control" value="Paredes Camacho" disabled>
-				</div>
-				<div class="mb-3">
-					<label class="form-label text-start w-100">Rol</label>
-					<input type="text" class="form-control" value="Secretario" disabled>
-				</div>
-				<div class="mb-3">
-					<label class="form-label text-start w-100">Año de entrada</label>
-					<input type="text" class="form-control" value="2019" disabled>
-				</div>
-				<div class="mb-3">
-					<label class="form-label text-start w-100">Fecha de registro</label>
-					<input type="text" class="form-control" value="18 de enero de 2020" disabled>
-				</div>
-			</div>
-		</div>
-
-		<!-- Recuadro: Actualizar contraseña -->
-		<div class="card shadow mb-4 w-100" style="max-width: 600px;">
-			<div class="card-header bg-secondary text-white fw-bold">
-				Actualizar contraseña
-			</div>
-			<div class="card-body">
-				<form>
-					<div class="mb-3">
-						<label for="actual" class="form-label text-start w-100">Contraseña actual</label>
-						<input type="password" id="actual" class="form-control" />
-					</div>
-					<div class="mb-3">
-						<label for="nueva" class="form-label text-start w-100">Nueva contraseña</label>
-						<input type="password" id="nueva" class="form-control" />
-					</div>
-					<div class="mb-3">
-						<label for="repetir" class="form-label text-start w-100">Repetir contraseña</label>
-						<input type="password" id="repetir" class="form-control" />
-					</div>
-					<button type="submit" class="btn btn-primary w-100">Actualizar</button>
-				</form>
-			</div>
-		</div>
-
-	</section>
+            <!-- Recuadro para Actualizar Contraseña -->
+            <form @submit.prevent="actualizarContrasena" class="card shadow-sm">
+                <div class="card-header bg-secondary text-white fw-bold text-center">
+                    Actualizar Contraseña
+                </div>
+                 <div class="card-body p-4">
+                     <div class="mb-3">
+                        <label for="claveActual" class="form-label">Contraseña Actual</label>
+                        <input id="claveActual" type="password" v-model="claveActual" class="form-control"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="claveNueva" class="form-label">Nueva Contraseña</label>
+                        <input id="claveNueva" type="password" v-model="claveNueva" class="form-control"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="repetirClaveNueva" class="form-label">Repetir Nueva Contraseña</label>
+                        <input id="repetirClaveNueva" type="password" v-model="repetirClaveNueva" class="form-control" />
+                    </div>
+                     <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary px-5">Actualizar</button>
+                    </div>
+                 </div>
+            </form>
+        </div>
+        <div v-else class="alert alert-warning">
+            Cargando información del perfil...
+        </div>
+    </section>
 </template>
+
+<style scoped>
+.form-control-plaintext-custom {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+    background-color: white;
+    font-size: 1rem;
+    font-weight: 400;
+    color: #212529;
+}
+.form-label {
+    margin-bottom: 0.5rem;
+}
+</style>

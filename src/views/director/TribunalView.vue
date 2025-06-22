@@ -4,62 +4,85 @@ import { usuarios } from '@/data/usuarios.js'
 
 const busqueda = ref('')
 
-const tribunales = usuarios.filter(usuario => usuario.rol === 'tribunal')
+// Filtra directamente los usuarios que son tribunales
+const tribunales = computed(() => 
+    usuarios.filter(usuario => usuario.rol === 'tribunal')
+);
 
+// Filtra la lista de tribunales según la búsqueda
 const tribunalesFiltrados = computed(() => {
-	const criterio = busqueda.value.trim().toLowerCase()
-	if (!criterio) return tribunales
+    const criterio = busqueda.value.trim().toLowerCase()
+    if (!criterio) return tribunales.value
 
-	return tribunales.filter(tribunal =>
-		[tribunal.nombres, tribunal.primer_apellido, tribunal.segundo_apellido, tribunal.especialidad]
-			.some(campo => campo.toLowerCase().includes(criterio))
-	)
+    return tribunales.value.filter(tribunal =>
+        [tribunal.nombres, tribunal.primer_apellido, tribunal.segundo_apellido, tribunal.especialidad]
+            .some(campo => campo.toLowerCase().includes(criterio))
+    )
 })
 </script>
 
 <template>
-	<section class="container mt-4">
-		<!-- Título -->
-		<h2 class="text-center fw-bold mb-4">Tribunales</h2>
+    <section class="container-fluid mt-4">
+        <!-- Encabezado de la página con TÍTULO CENTRADO -->
+        <div class="text-center mb-4">
+            <h2 class="text-dark-emphasis fw-bold mb-0">Gestión de Tribunales</h2>
+        </div>
 
-		<!-- Fila de búsqueda y botón -->
-		<div class="d-flex justify-content-between align-items-center mb-3">
-			<input type="text" class="form-control me-2" placeholder="Buscar tribunal..." v-model="busqueda"
-				style="max-width: 300px;" />
-			<router-link :to="{ name: 'DDesTribunalView' }" class="btn btn-primary">
-				Designar tribunal
-			</router-link>
-		</div>
+        <!-- Barra de Búsqueda y Botón Añadir -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <div class="input-group" style="max-width: 400px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control" placeholder="Buscar por nombre, apellido o especialidad..." v-model="busqueda" />
+            </div>
+            <router-link :to="{ name: 'DDesTribunalView' }" class="btn btn-primary d-flex align-items-center">
+                <i class="bi bi-people-fill me-2"></i> Designar Tribunales
+            </router-link>
+        </div>
 
-		<!-- Tabla de tribunales -->
-		<div class="table-responsive">
-			<table class="table table-bordered table-striped align-middle">
-				<thead class="table-dark text-center">
-					<tr>
-						<th>Primer Apellido</th>
-						<th>Segundo Apellido</th>
-						<th>Nombres</th>
-						<th>Especialidad</th>
-						<th>Perfiles Asignados</th>
-						<th>Acciones</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr v-for="tribunal in tribunalesFiltrados" :key="tribunal.idUsuario" class="text-center">
-						<td>{{ tribunal.primer_apellido }}</td>
-						<td>{{ tribunal.segundo_apellido }}</td>
-						<td>{{ tribunal.nombres }}</td>
-						<td>{{ tribunal.especialidad }}</td>
-						<td>{{ tribunal.perfiles || 0 }}</td>
-						<td>
-							<router-link :to="{ name: 'DTribunalDetalleView', params: { id: tribunal.idUsuario } }"
-								class="btn btn-sm btn-info">
-								Ver detalle
-							</router-link>
-						</td>
-					</tr>
-				</tbody>
-			</table>
-		</div>
-	</section>
+        <!-- Tabla de tribunales con estilo mejorado -->
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr class="text-center">
+                                <th>Nombre Completo</th>
+                                <th>Especialidad</th>
+                                <th>Temas Asignados</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="tribunal in tribunalesFiltrados" :key="tribunal.idUsuario">
+                                <td>
+                                    <div class="px-3">
+                                        {{ tribunal.primer_apellido }} {{ tribunal.segundo_apellido }}, {{ tribunal.nombres }}
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill">
+                                        {{ tribunal.especialidad }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary rounded-circle" style="width: 2rem; height: 2rem; line-height: 1.5rem; font-size: 0.9rem;">
+                                        {{ tribunal.perfiles || 0 }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <router-link :to="{ name: 'DTribunalDetalleView', params: { id: tribunal.idUsuario } }"
+                                        class="btn btn-sm btn-outline-info" title="Ver detalle del tribunal">
+                                        <i class="bi bi-eye-fill"></i> Ver Detalle
+                                    </router-link>
+                                </td>
+                            </tr>
+                            <tr v-if="tribunalesFiltrados.length === 0">
+                                <td colspan="4" class="text-center text-muted p-4">No se encontraron tribunales con ese criterio.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
 </template>

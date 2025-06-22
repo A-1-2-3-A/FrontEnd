@@ -8,113 +8,104 @@ const repetirClave = ref('')
 const nombres = ref('')
 const primerApellido = ref('')
 const segundoApellido = ref('')
+const fechaNacimiento = ref('') // Nuevo campo para fecha de nacimiento
 const rol = ref('')
-const estado = ref(true)
-
-// Fecha con GMT-4
 const fechaRegistro = ref('')
 
 onMounted(() => {
     const ahora = new Date()
-    const yyyy = ahora.getFullYear()
-    const mm = String(ahora.getMonth() + 1).padStart(2, '0')
-    const dd = String(ahora.getDate()).padStart(2, '0')
-    fechaRegistro.value = `${yyyy}-${mm}-${dd}`
+    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    fechaRegistro.value = ahora.toLocaleDateString('es-ES', options);
 })
 
 // Campos dependientes del rol
-const gestion = ref('')
-const especialidad = ref('')
+const especialidadesDisponibles = ref(['Desarrollo de software', 'Telemática', 'Gestión empresarial']);
+const especialidadesSeleccionadas = ref([]);
 const tipo = ref('')
-const anioEntrada = ref('')
+
 </script>
 
 <template>
-    <section class="container mt-4 d-flex flex-column align-items-center">
-        <div class="card shadow w-100" style="max-width: 600px;">
-            <div class="card-header bg-primary text-white fw-bold">
-                Agregar nuevo usuario
+    <section class="container mt-4">
+        <form class="card shadow-sm w-100" style="max-width: 600px; margin: auto;">
+            <div class="card-header bg-primary text-white fw-bold text-center">
+                Agregar Nuevo Usuario
             </div>
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <label for="nombres" class="form-label">Nombres</label>
+                    <input id="nombres" type="text" v-model="nombres" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="primerApellido" class="form-label">Primer Apellido</label>
+                    <input id="primerApellido" type="text" v-model="primerApellido" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="segundoApellido" class="form-label">Segundo Apellido</label>
+                    <input id="segundoApellido" type="text" v-model="segundoApellido" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Correo Electrónico</label>
+                    <input id="email" type="email" v-model="usuario" class="form-control" placeholder="usuario@sistemas.edu.bo" />
+                </div>
+                <div class="mb-3">
+                    <label for="clave" class="form-label">Contraseña</label>
+                    <input id="clave" type="password" v-model="clave" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label for="repetirClave" class="form-label">Repetir Contraseña</label>
+                    <input id="repetirClave" type="password" v-model="repetirClave" class="form-control" />
+                </div>
+                
+                <!-- **NUEVO CAMPO: FECHA DE NACIMIENTO** -->
+                <div class="mb-3">
+                    <label for="fechaNacimiento" class="form-label">Fecha de Nacimiento</label>
+                    <input id="fechaNacimiento" type="date" v-model="fechaNacimiento" class="form-control" />
+                </div>
 
-            <div class="card-body">
-                <!-- Datos personales -->
                 <div class="mb-3">
-                    <label class="form-label text-start w-100">Nombres</label>
-                    <input type="text" v-model="nombres" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Primer apellido</label>
-                    <input type="text" v-model="primerApellido" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Segundo apellido</label>
-                    <input type="text" v-model="segundoApellido" class="form-control" />
-                </div>
-
-                <!-- Usuario y contraseña -->
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Correo electrónico</label>
-                    <input type="email" v-model="usuario" class="form-control" placeholder="usuario@sistemas.edu.bo" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Contraseña</label>
-                    <input type="password" v-model="clave" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Repetir contraseña</label>
-                    <input type="password" v-model="repetirClave" class="form-control" />
-                </div>
-
-                <!-- Rol -->
-                <div class="mb-3">
-                    <label class="form-label text-start w-100">Rol</label>
-                    <select v-model="rol" class="form-select">
+                    <label for="rol" class="form-label">Rol</label>
+                    <select id="rol" v-model="rol" class="form-select">
                         <option value="" disabled>Seleccione un rol</option>
-                        <option value="director">Director</option>
                         <option value="tribunal">Tribunal</option>
                         <option value="secretario">Secretario</option>
                         <option value="estudiante">Estudiante</option>
                     </select>
                 </div>
 
-                <!-- Campos adicionales según rol -->
-                <div v-if="rol === 'director'" class="mb-3">
-                    <label class="form-label text-start w-100">Gestión</label>
-                    <input type="text" v-model="gestion" class="form-control" placeholder="2023 - 2025" />
-                </div>
+                <!-- Campos condicionales -->
                 <div v-if="rol === 'tribunal'" class="mb-3">
-                    <label class="form-label text-start w-100">Especialidad</label>
-                    <select v-model="especialidad" class="form-select">
-                        <option value="" disabled>Seleccione especialidad</option>
-                        <option>Desarrollo de software</option>
-                        <option>Telemática</option>
-                        <option>Gestión empresarial</option>
-                    </select>
-                </div>
-                <div v-if="rol === 'estudiante'" class="mb-3">
-                    <label class="form-label text-start w-100">Tipo</label>
-                    <select v-model="tipo" class="form-select">
-                        <option value="" disabled>Seleccione tipo</option>
-                        <option value="regular">Regular</option>
-                        <option value="egresado">Egresado</option>
-                    </select>
-                </div>
-                <div v-if="rol === 'secretario'" class="mb-3">
-                    <label class="form-label text-start w-100">Año de entrada</label>
-                    <input type="number" v-model="anioEntrada" class="form-control" placeholder="2020" />
-                </div>
+                    <label class="form-label">Especialidades</label>
+                     <div class="border rounded p-2 bg-light">
+                         <div v-for="esp in especialidadesDisponibles" :key="esp" class="form-check form-check-inline">
+                             <input class="form-check-input" type="checkbox" :value="esp" v-model="especialidadesSeleccionadas" :id="`esp-${esp}`">
+                             <label class="form-check-label" :for="`esp-${esp}`">{{ esp }}</label>
+                         </div>
+                     </div>
+                 </div>
+                 <div v-if="rol === 'estudiante'" class="mb-3">
+                     <label class="form-label">Tipo de Estudiante</label>
+                      <select v-model="tipo" class="form-select">
+                          <option value="" disabled>Seleccione tipo</option>
+                          <option value="regular">Regular</option>
+                          <option value="egresado">Egresado</option>
+                      </select>
+                 </div>
 
-                <!-- Fecha (readonly, no editable) -->
+                <!-- **CAMPO MEJORADO: FECHA DE REGISTRO** -->
                 <div class="mb-3">
-                    <label class="form-label text-start w-100">Fecha de registro</label>
-                    <input type="date" class="form-control" :value="fechaRegistro" readonly />
+                    <label for="fechaRegistro" class="form-label">Fecha de Registro</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                        <input id="fechaRegistro" type="text" class="form-control" :value="fechaRegistro" disabled readonly />
+                    </div>
                 </div>
 
                 <!-- Botón guardar -->
                 <div class="text-center mt-4">
-                    <button class="btn btn-success px-4">Guardar usuario</button>
+                    <button class="btn btn-success px-5">Guardar Usuario</button>
                 </div>
             </div>
-        </div>
+        </form>
     </section>
 </template>

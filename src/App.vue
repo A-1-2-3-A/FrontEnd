@@ -1,7 +1,9 @@
 <script setup>
-	import { RouterLink, RouterView } from 'vue-router'
+import { RouterView } from 'vue-router';
+import Modal from '@/components/Modal.vue'; // Importa el nuevo componente
 </script>
 
-<template>	
-	<RouterView />
+<template>
+    <RouterView />
+    <Modal /> <!-- Añade el componente del modal aquí -->
 </template>

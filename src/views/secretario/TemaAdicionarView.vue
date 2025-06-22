@@ -1,146 +1,120 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usuarios } from '@/data/usuarios.js'
 
-// Nombre del tema
+// --- ESTADO DEL COMPONENTE ---
 const nombre = ref('')
-
-// Estudiante
 const textoEstudiante = ref('')
 const estudianteSeleccionado = ref(null)
 const mostrarOpciones = ref(false)
+const archivo = ref(null)
+const fechaRegistro = ref('')
 
-// Lista de estudiantes
-const estudiantes = computed(() =>
-    usuarios.filter(u => u.rol === 'estudiante')
-)
-
-const estudiantesFiltrados = computed(() => {
-    const criterio = textoEstudiante.value.trim().toLowerCase()
-    return estudiantes.value.filter(e =>
-        `${e.nombres} ${e.primer_apellido} ${e.segundo_apellido}`
-            .toLowerCase()
-            .includes(criterio)
-    )
+// --- LÓGICA DEL COMPONENTE ---
+onMounted(() => {
+    const ahora = new Date()
+    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    fechaRegistro.value = ahora.toLocaleDateString('es-ES', options);
 })
 
+const estudiantes = computed(() => usuarios.filter(u => u.rol === 'estudiante'));
+
+const estudiantesFiltrados = computed(() => {
+    const criterio = textoEstudiante.value.trim().toLowerCase();
+    return estudiantes.value.filter(e =>
+        `${e.nombres} ${e.primer_apellido} ${e.segundo_apellido}`.toLowerCase().includes(criterio)
+    );
+});
+
 function seleccionarEstudiante(estudiante) {
-    estudianteSeleccionado.value = estudiante
-    textoEstudiante.value = `${estudiante.primer_apellido} ${estudiante.segundo_apellido}, ${estudiante.nombres}`
-    mostrarOpciones.value = false
+    estudianteSeleccionado.value = estudiante;
+    textoEstudiante.value = `${estudiante.primer_apellido} ${estudiante.segundo_apellido}, ${estudiante.nombres}`;
+    mostrarOpciones.value = false;
 }
 
 function ocultarOpcionesConDelay() {
-    setTimeout(() => {
-        mostrarOpciones.value = false
-    }, 200)
+    setTimeout(() => { mostrarOpciones.value = false; }, 200);
 }
-
-// Archivo
-const archivo = ref(null)
 
 function handleFileUpload(event) {
-    const file = event.target.files[0]
+    const file = event.target.files[0];
     if (file) {
-        archivo.value = file
+        archivo.value = file;
     }
 }
 
-function eliminarArchivo() {
-    archivo.value = null
-}
-
-// Estado fijo
-const estado = ref('preliminar')
-
-function claseEstado() {
-    switch (estado.value) {
-        case 'aprobado': return 'badge bg-success'
-        case 'reprobado': return 'badge bg-danger'
-        case 'pendiente': return 'badge bg-warning text-dark'
-        case 'preliminar': return 'badge bg-secondary'
-        default: return 'badge bg-light'
+function registrarTema() {
+    if (!nombre.value || !estudianteSeleccionado.value || !archivo.value) {
+        alert('Nombre del tema, estudiante y archivo son requeridos.');
+        return;
     }
+    alert(`Registrando tema:\n- Nombre: ${nombre.value}\n- Estudiante: ${textoEstudiante.value}\n- Archivo: ${archivo.value.name}`);
 }
-
-function obtenerIconoArchivo(nombre) {
-    const extension = nombre.split('.').pop().toLowerCase()
-    if (['pdf'].includes(extension)) return '📄'
-    if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].includes(extension)) return '🖼️'
-    return '📁'
-}
-
 </script>
 
 <template>
-    <section class="container mt-4 d-flex flex-column align-items-center">
-        <div class="card shadow w-100" style="max-width: 600px;">
-            <div class="card-header bg-primary text-white fw-bold">
-                Registrar nuevo tema
+    <section class="container mt-4">
+        <form @submit.prevent="registrarTema" class="card shadow-sm w-100" style="max-width: 600px; margin: auto;">
+            <div class="card-header bg-primary text-white fw-bold text-center">
+                Registrar Nuevo Tema
             </div>
-
-            <div class="card-body">
-                <!-- Nombre del tema -->
+            <div class="card-body p-4">
                 <div class="mb-3">
-                    <label class="form-label text-start w-100">Nombre del tema</label>
-                    <input type="text" v-model="nombre" class="form-control" />
+                    <label class="form-label">Nombre del Tema</label>
+                    <input type="text" v-model="nombre" class="form-control" required />
                 </div>
 
-                <!-- Estudiante -->
                 <div class="mb-3 position-relative">
-                    <label class="form-label text-start w-100">Seleccione estudiante</label>
-                    <input type="text" class="form-control" v-model="textoEstudiante"
-                        placeholder="Escriba para buscar..." @focus="mostrarOpciones = true"
-                        @blur="ocultarOpcionesConDelay" />
-                    <ul v-if="mostrarOpciones && estudiantesFiltrados.length" class="list-group position-absolute w-100"
-                        style="z-index: 10; max-height: 200px; overflow-y: auto;">
-                        <li v-for="e in estudiantesFiltrados" :key="e.idUsuario"
-                            class="list-group-item list-group-item-action" style="cursor: pointer"
-                            @mousedown.prevent="seleccionarEstudiante(e)">
+                    <label class="form-label">Seleccione Estudiante</label>
+                    <input type="text" class="form-control" v-model="textoEstudiante" placeholder="Escriba para buscar..." @focus="mostrarOpciones = true" @blur="ocultarOpcionesConDelay" required />
+                    <ul v-if="mostrarOpciones && estudiantesFiltrados.length" class="list-group position-absolute w-100" style="z-index: 10; max-height: 200px; overflow-y: auto;">
+                        <li v-for="e in estudiantesFiltrados" :key="e.idUsuario" class="list-group-item list-group-item-action" style="cursor: pointer" @mousedown.prevent="seleccionarEstudiante(e)">
                             {{ e.primer_apellido }} {{ e.segundo_apellido }}, {{ e.nombres }}
                         </li>
                     </ul>
                 </div>
 
-                <!-- Archivo -->
+                <!-- **SECCIÓN DE ARCHIVO CORREGIDA Y SIMPLIFICADA** -->
                 <div class="mb-3">
-                    <label class="form-label text-start w-100">Archivo del tema</label>
+                    <label for="fileUpload" class="form-label">Archivo del Tema (PDF)</label>
+                    <div class="input-group">
+                         <input type="file" class="form-control" @change="handleFileUpload" accept=".pdf" id="fileUpload" required>
+                         <!-- El label nativo del input-group actúa como el botón "Examinar" -->
+                    </div>
+                     <small v-if="archivo" class="d-block text-success mt-1">Archivo seleccionado: {{ archivo.name }}</small>
+                </div>
 
-                    <!-- Zona de carga personalizada -->
-                    <div class="border rounded p-4 text-center bg-light mb-2" style="cursor: pointer"
-                        @click="$refs.inputArchivo.click()" @dragover.prevent @drop.prevent="handleFileUpload($event)">
-                        <!-- Si no hay archivo -->
-                        <p v-if="!archivo" class="text-muted mb-0">
-                            Arrastra o haz clic aquí para cargar archivo
-                        </p>
-
-                        <!-- Si hay archivo cargado -->
-                        <div v-else class="d-flex justify-content-between align-items-center px-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <span style="font-size: 1.5rem">{{ obtenerIconoArchivo(archivo.name) }}</span>
-                                <span class="text-success text-start">{{ archivo.name }}</span>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" @click.stop="eliminarArchivo">Quitar</button>
+                <div class="row align-items-center">
+                    <div class="col-md-6 mb-3">
+                         <label class="form-label text-muted">Estado del Tema</label>
+                         <div class="form-control-plaintext-custom">
+                             <span class="badge text-bg-secondary">PRELIMINAR</span>
+                         </div>
+                    </div>
+                     <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted">Fecha de Registro</label>
+                        <div class="form-control-plaintext-custom">
+                            <i class="bi bi-calendar-event me-2"></i>{{ fechaRegistro }}
                         </div>
                     </div>
-
-                    <!-- Input oculto tradicional -->
-                    <input ref="inputArchivo" type="file" class="d-none" @change="handleFileUpload" />
                 </div>
 
-                <!-- Estado (no editable) -->
-                <div class="mb-3 d-flex justify-content-between align-items-center">
-                    <label class="form-label fw-semibold mb-0">Estado del tema</label>
-                    <span :class="claseEstado()" class="px-3 py-1">
-                        {{ estado.toUpperCase() }}
-                    </span>
-                </div>
-
-                <!-- Botón Guardar -->
-                <div class="text-center mt-4">
-                    <button class="btn btn-success px-4">Registrar tema</button>
+                <div class="text-center mt-4 border-top pt-4">
+                    <button type="submit" class="btn btn-success px-5">Registrar Tema</button>
                 </div>
             </div>
-        </div>
+        </form>
     </section>
 </template>
+
+<style scoped>
+.form-control-plaintext-custom {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+    background-color: #f8f9fa;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #212529;
+}
+</style>

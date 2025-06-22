@@ -5,8 +5,9 @@ import Footer from '../components/Footer.vue';
 
 <template>
     <div class="d-flex flex-column min-vh-100">
-        <Header state="publico" />
-        <main class="flex-grow-1 d-flex flex-column justify-content-center align-items-center">
+        <Header />
+        <!-- **CORRECCIÓN**: Se quitan las clases de centrado para que el contenido fluya naturalmente -->
+        <main class="flex-grow-1">
             <RouterView />
         </main>
         <Footer />
