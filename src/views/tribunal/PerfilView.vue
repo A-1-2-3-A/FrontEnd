@@ -1,34 +1,100 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth'; 
-import { usuarios } from '@/data/usuarios.js'; 
+import { useModalStore } from '@/stores/modal';
+import apiClient from '@/api/axios';
 
 const authStore = useAuthStore();
-const usuario = ref(null);
+const modalStore = useModalStore();
 
-const claveActual = ref('');
-const claveNueva = ref('');
+const usuario = ref(null);
+const isLoading = ref(true);
+const especialidadesDisponibles = ref([]);
+
+const claveData = ref({
+    clave_actual: '',
+    clave_nueva: ''
+});
 const repetirClaveNueva = ref('');
 
-onMounted(() => {
-    const usuarioLogueado = authStore.usuario;
-    if (usuarioLogueado) {
-        const detallesCompletos = usuarios.find(u => u.idUsuario === usuarioLogueado.id);
-        usuario.value = { ...usuarioLogueado, ...detallesCompletos };
-    }
-});
+// Cargar el perfil del usuario desde la API al montar el componente.
+async function fetchData() {
+    isLoading.value = true;
+    try {
+        // Se usan Promise.all para hacer ambas llamadas a la API en paralelo.
+        const [perfilResponse, especialidadesResponse] = await Promise.all([
+            apiClient.get('/usuarios/perfil'),
+            apiClient.get('/especialidades')
+        ]);
+        
+        usuario.value = perfilResponse.data.data;
+        especialidadesDisponibles.value = especialidadesResponse.data.data;
 
-function actualizarContrasena() {
-    if (!claveActual.value || !claveNueva.value || !repetirClaveNueva.value) {
-        alert("Todos los campos de contraseña son requeridos.");
-        return;
+    } catch (error) {
+        console.error('Error al cargar los datos del perfil:', error);
+        modalStore.showModal({
+            title: 'Error',
+            message: 'No se pudo cargar la información del perfil.',
+            type: 'error'
+        });
+    } finally {
+        isLoading.value = false;
     }
-    if (claveNueva.value !== repetirClaveNueva.value) {
-        alert("Las nuevas contraseñas no coinciden.");
-        return;
-    }
-    alert("Llamando a la API para actualizar la contraseña...");
 }
+
+
+onMounted(fetchData);
+
+// Actualizar la contraseña a través de la API.
+async function actualizarContrasena() {
+    if (claveData.value.clave_nueva !== repetirClaveNueva.value) {
+        modalStore.showModal({ title: 'Error', message: 'Las nuevas contraseñas no coinciden.', type: 'error' });
+        return;
+    }
+    if (!claveData.value.clave_actual || !claveData.value.clave_nueva) {
+        modalStore.showModal({ title: 'Error', message: 'Todos los campos de contraseña son requeridos.', type: 'error' });
+        return;
+    }
+
+    try {
+        await apiClient.put(`/usuarios/${authStore.usuario.id}/cambiar-clave`, claveData.value);
+        
+        modalStore.showModal({ 
+            title: 'Éxito', 
+            message: 'Contraseña actualizada correctamente.', 
+            type: 'success' 
+        });
+
+        // Limpiar campos del formulario después del éxito
+        claveData.value.clave_actual = '';
+        claveData.value.clave_nueva = '';
+        repetirClaveNueva.value = '';
+
+    } catch (error) {
+        modalStore.showModal({ 
+            title: 'Error', 
+            message: error.response?.data?.message || 'No se pudo actualizar la contraseña.', 
+            type: 'error' 
+        });
+    }
+}
+
+// Esta propiedad ahora busca los nombres de las especialidades.
+const especialidadesFormateadas = computed(() => {
+    // Si no tenemos los datos necesarios, devuelve un texto por defecto.
+    if (!usuario.value || !Array.isArray(usuario.value.especialidades) || especialidadesDisponibles.value.length === 0) {
+        return 'No asignadas';
+    }
+
+    // Filtra la lista de especialidades disponibles...
+    return especialidadesDisponibles.value
+        // ...quedándose solo con aquellas cuyo ID está en el array de especialidades del usuario.
+        .filter(esp => usuario.value.especialidades.includes(esp.id))
+        // Mapea el resultado para obtener solo los nombres.
+        .map(esp => esp.nombre_especialidad)
+        // Une los nombres en una sola cadena de texto.
+        .join(', ');
+});
 </script>
 
 <template>
@@ -41,28 +107,28 @@ function actualizarContrasena() {
                 </div>
                 <div class="card-body p-4">
                     <div class="mb-3">
-                        <label class="form-label">Nombres</label>
+                        <label class="form-label fw-bold">Nombres</label>
                         <div class="form-control-plaintext-custom">{{ usuario.nombres }}</div>
                     </div>
                      <div class="mb-3">
-                        <label class="form-label">Apellidos</label>
-                        <div class="form-control-plaintext-custom">{{ usuario.primer_apellido }} {{ usuario.segundo_apellido }}</div>
+                        <label class="form-label fw-bold">Apellidos</label>
+                        <div class="form-control-plaintext-custom">{{ usuario.apellido_primero }} {{ usuario.apellido_segundo }}</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Correo Electrónico</label>
+                        <label class="form-label fw-bold">Correo Electrónico</label>
                         <div class="form-control-plaintext-custom bg-light">{{ usuario.usuario }}</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Rol</label>
+                        <label class="form-label fw-bold">Rol</label>
                         <div class="form-control-plaintext-custom text-capitalize">{{ usuario.rol }}</div>
                     </div>
-                    <div v-if="usuario.rol === 'tribunal' || usuario.rol === 'director'" class="mb-3">
-                        <label class="form-label">Especialidad</label>
-                        <div class="form-control-plaintext-custom">{{ usuario.especialidad || 'No asignada' }}</div>
+                    <div v-if="usuario.rol === 'Tribunal' || usuario.rol === 'Director'" class="mb-3">
+                        <label class="form-label fw-bold">Especialidades</label>
+                        <div class="form-control-plaintext-custom">{{ especialidadesFormateadas }}</div>
                     </div>
-                     <div v-if="usuario.rol === 'estudiante'" class="mb-3">
-                        <label class="form-label">Tipo de Estudiante</label>
-                        <div class="form-control-plaintext-custom text-capitalize">{{ usuario.tipo || 'No asignado' }}</div>
+                     <div v-if="usuario.rol === 'Estudiante'" class="mb-3">
+                        <label class="form-label fw-bold">Tipo de Estudiante</label>
+                        <div class="form-control-plaintext-custom text-capitalize">{{ usuario.tipo_estudiante }}</div>
                     </div>
                 </div>
             </div>
@@ -73,13 +139,13 @@ function actualizarContrasena() {
                     Actualizar Contraseña
                 </div>
                  <div class="card-body p-4">
-                     <div class="mb-3">
+                    <div class="mb-3">
                         <label for="claveActual" class="form-label">Contraseña Actual</label>
-                        <input id="claveActual" type="password" v-model="claveActual" class="form-control"/>
+                        <input id="claveActual" type="password" v-model="claveData.clave_actual" class="form-control" required/>
                     </div>
                     <div class="mb-3">
                         <label for="claveNueva" class="form-label">Nueva Contraseña</label>
-                        <input id="claveNueva" type="password" v-model="claveNueva" class="form-control"/>
+                        <input id="claveNueva" type="password" v-model="claveData.clave_nueva" class="form-control" required/>
                     </div>
                     <div class="mb-3">
                         <label for="repetirClaveNueva" class="form-label">Repetir Nueva Contraseña</label>

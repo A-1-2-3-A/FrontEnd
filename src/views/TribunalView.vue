@@ -1,24 +1,40 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { usuarios } from '@/data/usuarios.js'
+import { ref, computed, onMounted} from 'vue'
+import apiClient from '@/api/axios.js'
 
 const busqueda = ref('')
+const tribunales = ref([])
+const isLoading = ref(true)
 
-// Filtra directamente los usuarios que son tribunales
-const tribunales = computed(() => 
-    usuarios.filter(usuario => usuario.rol === 'tribunal')
-);
+// Función para obtener los tribunales directamente de la API.
+async function fetchTribunales() {
+    isLoading.value = true
+    try {
+        // Se llama al endpoint público GET /public/tribunales.
+        // Este endpoint ya devuelve solo los usuarios correctos (Tribunal y Director).
+        const response = await apiClient.get('/public/tribunales')
+        tribunales.value = response.data.data
+    } catch (error) {
+        console.error("Error al obtener los tribunales:", error)
+    } finally {
+        isLoading.value = false
+    }
+}
 
-// Filtra la lista de tribunales según la búsqueda
+onMounted(fetchTribunales)
+
+// Filtra directamente sobre la lista 'tribunales'
+// que contiene los datos de la API.
 const tribunalesFiltrados = computed(() => {
-    const criterio = busqueda.value.trim().toLowerCase()
-    if (!criterio) return tribunales.value
-
+    if (!busqueda.value.trim()) {
+        return tribunales.value;
+    }
+    const criterio = busqueda.value.trim().toLowerCase();
     return tribunales.value.filter(tribunal =>
-        [tribunal.nombres, tribunal.primer_apellido, tribunal.segundo_apellido, tribunal.especialidad]
-            .some(campo => campo && campo.toLowerCase().includes(criterio))
-    )
-})
+        `${tribunal.nombres} ${tribunal.apellido_primero} ${tribunal.apellido_segundo}`.toLowerCase().includes(criterio) ||
+        (tribunal.especialidades && tribunal.especialidades.toLowerCase().includes(criterio))
+    );
+});
 </script>
 
 <template>
@@ -46,18 +62,24 @@ const tribunalesFiltrados = computed(() => {
                         <thead class="table-light">
                             <tr class="text-center">
                                 <th class="ps-4 text-start" style="width: 50%;">Nombre Completo</th>
-                                <th class="text-center" style="width: 50%;">Especialidad Principal</th>
+                                <th class="text-center" style="width: 50%;">Especialidades</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="tribunal in tribunalesFiltrados" :key="tribunal.idUsuario">
                                 <td class="ps-4">
-                                    <p class="mb-0 fw-medium">{{ tribunal.primer_apellido }} {{ tribunal.segundo_apellido }}, {{ tribunal.nombres }}</p>
+                                    <p class="mb-0 fw-medium">{{ tribunal.apellido_primero }} {{ tribunal.apellido_segundo }}, {{ tribunal.nombres }}</p>
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill px-3 py-2">
-                                        {{ tribunal.especialidad }}
-                                    </span>
+                                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                                        <template v-if="tribunal.especialidades">
+                                            <span v-for="especialidad in tribunal.especialidades.split(', ')" :key="especialidad"
+                                                class="badge bg-primary-subtle text-primary-emphasis rounded-pill px-3 py-2 fw-medium">
+                                                {{ especialidad }}
+                                            </span>
+                                        </template>
+                                        <span v-else class="text-muted small">No asignadas</span>
+                                    </div>
                                 </td>
                             </tr>
                              <tr v-if="tribunalesFiltrados.length === 0">

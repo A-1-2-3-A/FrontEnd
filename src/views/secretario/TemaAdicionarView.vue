@@ -1,34 +1,100 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { usuarios } from '@/data/usuarios.js'
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import apiClient from '@/api/axios.js';
+import { useModalStore } from '@/stores/modal';
 
-// --- ESTADO DEL COMPONENTE ---
-const nombre = ref('')
-const textoEstudiante = ref('')
-const estudianteSeleccionado = ref(null)
-const mostrarOpciones = ref(false)
-const archivo = ref(null)
-const fechaRegistro = ref('')
+const router = useRouter();
+const modalStore = useModalStore();
 
-// --- LÓGICA DEL COMPONENTE ---
+const nombre = ref('');
+const textoEstudiante = ref('');
+const estudianteSeleccionado = ref(null);
+const archivo = ref(null);
+const fechaRegistro = ref('');
+
+// State para el selector de estudiantes
+const todosLosEstudiantes = ref([]);
+const mostrarOpciones = ref(false);
+const isLoading = ref(false); // Para el estado de carga del envío
+
+// Cargar la lista de usuarios para el selector de estudiantes.
+async function fetchEstudiantes() {
+    try {
+        const response = await apiClient.get('/usuarios');
+        // Filtramos en el cliente para quedarnos solo con los estudiantes.
+        todosLosEstudiantes.value = response.data.data.filter(u => u.rol === 'Estudiante');
+    } catch (error) {
+        console.error("Error al obtener usuarios:", error);
+    }
+}
+
 onMounted(() => {
-    const ahora = new Date()
+    // Seteamos la fecha de registro y cargamos los estudiantes
+    const ahora = new Date();
     const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
     fechaRegistro.value = ahora.toLocaleDateString('es-ES', options);
-})
+    fetchEstudiantes();
+});
 
-const estudiantes = computed(() => usuarios.filter(u => u.rol === 'estudiante'));
+// Lógica para registrar el nuevo tema en la API.
+async function registrarTema() {
+    if (!nombre.value || !estudianteSeleccionado.value || !archivo.value) {
+        modalStore.showModal({
+            title: 'Datos Incompletos',
+            message: 'El nombre del tema, el estudiante y el archivo PDF son requeridos.',
+            type: 'error'
+        });
+        return;
+    }
 
+    isLoading.value = true;
+
+    // Usamos FormData porque estamos enviando un archivo.
+    const formData = new FormData();
+    formData.append('nombre', nombre.value);
+    formData.append('id_estudiante', estudianteSeleccionado.value.id);
+    formData.append('archivo', archivo.value);
+
+    try {
+        await apiClient.post('/temas', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+
+        modalStore.showModal({
+            title: 'Éxito',
+            message: 'El nuevo tema ha sido registrado correctamente.',
+            type: 'success'
+        });
+
+        router.push({ name: 'STemaView' });
+
+    } catch (error) {
+        modalStore.showModal({
+            title: 'Error de Registro',
+            message: error.response?.data?.message || 'No se pudo registrar el tema.',
+            type: 'error'
+        });
+    } finally {
+        isLoading.value = false;
+    }
+}
+
+// Autocomplete y subida de archivo
 const estudiantesFiltrados = computed(() => {
+    if (!textoEstudiante.value) return [];
     const criterio = textoEstudiante.value.trim().toLowerCase();
-    return estudiantes.value.filter(e =>
-        `${e.nombres} ${e.primer_apellido} ${e.segundo_apellido}`.toLowerCase().includes(criterio)
+    // Filtramos sobre la lista real de estudiantes.
+    return todosLosEstudiantes.value.filter(e =>
+        `${e.nombres} ${e.apellido_primero} ${e.apellido_segundo}`.toLowerCase().includes(criterio)
     );
 });
 
 function seleccionarEstudiante(estudiante) {
     estudianteSeleccionado.value = estudiante;
-    textoEstudiante.value = `${estudiante.primer_apellido} ${estudiante.segundo_apellido}, ${estudiante.nombres}`;
+    textoEstudiante.value = `${estudiante.apellido_primero} ${estudiante.apellido_segundo || ''}, ${estudiante.nombres}`;
     mostrarOpciones.value = false;
 }
 
@@ -38,17 +104,13 @@ function ocultarOpcionesConDelay() {
 
 function handleFileUpload(event) {
     const file = event.target.files[0];
-    if (file) {
+    if (file && file.type === "application/pdf") {
         archivo.value = file;
+    } else {
+        modalStore.showModal({ title: 'Archivo no válido', message: 'Por favor, seleccione un archivo PDF.', type: 'warning' });
+        event.target.value = ''; // Limpiar el input
+        archivo.value = null;
     }
-}
-
-function registrarTema() {
-    if (!nombre.value || !estudianteSeleccionado.value || !archivo.value) {
-        alert('Nombre del tema, estudiante y archivo son requeridos.');
-        return;
-    }
-    alert(`Registrando tema:\n- Nombre: ${nombre.value}\n- Estudiante: ${textoEstudiante.value}\n- Archivo: ${archivo.value.name}`);
 }
 </script>
 
@@ -66,32 +128,36 @@ function registrarTema() {
 
                 <div class="mb-3 position-relative">
                     <label class="form-label">Seleccione Estudiante</label>
-                    <input type="text" class="form-control" v-model="textoEstudiante" placeholder="Escriba para buscar..." @focus="mostrarOpciones = true" @blur="ocultarOpcionesConDelay" required />
-                    <ul v-if="mostrarOpciones && estudiantesFiltrados.length" class="list-group position-absolute w-100" style="z-index: 10; max-height: 200px; overflow-y: auto;">
-                        <li v-for="e in estudiantesFiltrados" :key="e.idUsuario" class="list-group-item list-group-item-action" style="cursor: pointer" @mousedown.prevent="seleccionarEstudiante(e)">
-                            {{ e.primer_apellido }} {{ e.segundo_apellido }}, {{ e.nombres }}
+                    <input type="text" class="form-control" v-model="textoEstudiante"
+                        placeholder="Escriba para buscar..." @focus="mostrarOpciones = true"
+                        @blur="ocultarOpcionesConDelay" required />
+                    <ul v-if="mostrarOpciones && estudiantesFiltrados.length" class="list-group position-absolute w-100"
+                        style="z-index: 10; max-height: 200px; overflow-y: auto;">
+                        <li v-for="e in estudiantesFiltrados" :key="e.id" class="list-group-item list-group-item-action"
+                            style="cursor: pointer" @mousedown.prevent="seleccionarEstudiante(e)">
+                            {{ e.apellido_primero }} {{ e.apellido_segundo }}, {{ e.nombres }}
                         </li>
                     </ul>
                 </div>
 
-                <!-- **SECCIÓN DE ARCHIVO CORREGIDA Y SIMPLIFICADA** -->
                 <div class="mb-3">
                     <label for="fileUpload" class="form-label">Archivo del Tema (PDF)</label>
                     <div class="input-group">
-                         <input type="file" class="form-control" @change="handleFileUpload" accept=".pdf" id="fileUpload" required>
-                         <!-- El label nativo del input-group actúa como el botón "Examinar" -->
+                        <input type="file" class="form-control" @change="handleFileUpload" accept=".pdf" id="fileUpload"
+                            required>
                     </div>
-                     <small v-if="archivo" class="d-block text-success mt-1">Archivo seleccionado: {{ archivo.name }}</small>
+                    <small v-if="archivo" class="d-block text-success mt-1">Archivo seleccionado: {{ archivo.name
+                    }}</small>
                 </div>
 
                 <div class="row align-items-center">
                     <div class="col-md-6 mb-3">
-                         <label class="form-label text-muted">Estado del Tema</label>
-                         <div class="form-control-plaintext-custom">
-                             <span class="badge text-bg-secondary">PRELIMINAR</span>
-                         </div>
+                        <label class="form-label text-muted">Estado del Tema</label>
+                        <div class="form-control-plaintext-custom">
+                            <span class="badge text-bg-secondary">PRELIMINAR</span>
+                        </div>
                     </div>
-                     <div class="col-md-6 mb-3">
+                    <div class="col-md-6 mb-3">
                         <label class="form-label text-muted">Fecha de Registro</label>
                         <div class="form-control-plaintext-custom">
                             <i class="bi bi-calendar-event me-2"></i>{{ fechaRegistro }}
@@ -100,7 +166,11 @@ function registrarTema() {
                 </div>
 
                 <div class="text-center mt-4 border-top pt-4">
-                    <button type="submit" class="btn btn-success px-5">Registrar Tema</button>
+                    <button type="submit" class="btn btn-success px-5" :disabled="isLoading">
+                        <span v-if="isLoading" class="spinner-border spinner-border-sm" role="status"
+                            aria-hidden="true"></span>
+                        <span v-else>Registrar Tema</span>
+                    </button>
                 </div>
             </div>
         </form>

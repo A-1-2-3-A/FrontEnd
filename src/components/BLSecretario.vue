@@ -16,9 +16,6 @@
             <router-link :to="{ name: 'STemaView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
                 <i class="bi bi-file-earmark-plus-fill me-2"></i> Registrar Temas
             </router-link>
-             <router-link :to="{ name: 'PublicView' }" class="nav-link text-white d-flex align-items-center px-3 py-2 mt-auto mb-2">
-                <i class="bi bi-box-arrow-left me-2"></i> Salir
-            </router-link>
         </nav>
     </div>
 </template>

@@ -9,6 +9,30 @@ const router = useRouter();
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const usuario = computed(() => authStore.usuario);
 
+
+// Propiedad computada para la ruta de inicio dinámica
+const homeRoute = computed(() => {
+    // Si el usuario no está autenticado, el logo lleva a la página pública.
+    if (!isAuthenticated.value) {
+        return { name: 'PublicView' };
+    }
+
+    // Si está autenticado, determina la ruta principal según su rol.
+    switch (usuario.value.rol) {
+        case 'Director':
+            return { name: 'DPrincipalView' };
+        case 'Secretario':
+            return { name: 'SPrincipalView' };
+        case 'Tribunal':
+            return { name: 'TPrincipalView' };
+        case 'Estudiante':
+            return { name: 'EPrincipalView' };
+        default:
+            // Fallback por si acaso, aunque no debería ocurrir.
+            return { name: 'PublicView' };
+    }
+});
+
 function cerrarSesion() {
     authStore.logout();
 }
@@ -18,7 +42,7 @@ function cerrarSesion() {
     <header class="app-header shadow-sm">
         <!-- Logo (ocupa su espacio necesario) -->
         <div class="logo-container">
-            <router-link :to="{ name: 'PublicView' }" class="d-flex align-items-center text-decoration-none text-white">
+            <router-link :to="homeRoute" class="d-flex align-items-center text-decoration-none text-white">
                 <img src="@/assets/image.png" alt="Logo" class="logo" />
             </router-link>
         </div>
@@ -40,13 +64,18 @@ function cerrarSesion() {
 
             <!-- Si el usuario SÍ está autenticado -->
             <div v-else class="dropdown">
-                <button class="btn btn-dark dropdown-toggle d-flex align-items-center" type="button" id="userMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn btn-dark dropdown-toggle d-flex align-items-center" type="button" id="userMenuButton"
+                    data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-person-circle fs-4 me-2"></i>
-                    <span>Hola, {{ usuario.usuario.split('@')[0] }}</span>
+                    <span>Hola, {{ usuario.nombres }}</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="userMenuButton">
-                    <li><h6 class="dropdown-header">Rol: {{ usuario.rol }}</h6></li>
-                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <h6 class="dropdown-header">Rol: {{ usuario.rol }}</h6>
+                    </li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
                     <li>
                         <a class="dropdown-item" href="#" @click.prevent="cerrarSesion">
                             <i class="bi bi-box-arrow-left me-2"></i> Cerrar Sesión
@@ -70,7 +99,8 @@ function cerrarSesion() {
 }
 
 .logo-container {
-    flex-shrink: 0; /* No se encoge */
+    flex-shrink: 0;
+    /* No se encoge */
 }
 
 .logo-container .logo {
@@ -79,7 +109,8 @@ function cerrarSesion() {
 }
 
 .header-title-container {
-    text-align: center; /* Centra el div del título */
+    text-align: center;
+    /* Centra el div del título */
 }
 
 .header-title h5 {
@@ -93,8 +124,10 @@ function cerrarSesion() {
 }
 
 .actions-container {
-    flex-shrink: 0; /* No se encoge */
-    min-width: 150px; /* Ancho mínimo para evitar que el título se desplace */
+    flex-shrink: 0;
+    /* No se encoge */
+    min-width: 150px;
+    /* Ancho mínimo para evitar que el título se desplace */
     display: flex;
     justify-content: flex-end;
 }

@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
 import PublicoLayout from '@/layouts/PublicoLayout.vue'
 import DirectorLayout from '@/layouts/DirectorLayout.vue'
 import TribunalLayout from '@/layouts/TribunalLayout.vue'
@@ -243,16 +245,25 @@ const router = createRouter({
     ],
 })
 
-// --- LÓGICA DE AUTENTICACIÓN DESACTIVADA TEMPORALMENTE ---
-// router.beforeEach((to, from, next) => {
-//     const rutasPublicas = ['PublicView', 'LoginView', 'TribunalView', 'TemaView']
-//     const usuario = getUsuarioActual()
+router.beforeEach((to, from, next) => {
+  // Obtenemos el store de autenticación
+  const authStore = useAuthStore();
 
-//     if (!rutasPublicas.includes(to.name) && !usuario) {
-//         next({ name: 'LoginView' })
-//     } else {
-//         next()
-//     }
-// })
+  // Lista de rutas que NO requieren autenticación
+  const rutasPublicas = ['PublicView', 'LoginView', 'TribunalView', 'TemaView'];
+
+  // Verificamos si la ruta a la que se intenta acceder es protegida
+  const esRutaProtegida = !rutasPublicas.includes(to.name);
+
+  // SI la ruta es protegida Y el usuario NO está autenticado...
+  if (esRutaProtegida && !authStore.isAuthenticated) {
+    // ...lo redirigimos a la página de login.
+    next({ name: 'LoginView' });
+  } else {
+    // En cualquier otro caso (ruta pública, o ruta protegida con usuario autenticado),
+    // permitimos que la navegación continúe.
+    next();
+  }
+});
 
 export default router

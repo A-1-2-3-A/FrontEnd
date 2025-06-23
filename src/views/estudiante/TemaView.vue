@@ -1,39 +1,55 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { temas } from '@/data/temas.js'
-import { useAuthStore } from '@/stores/auth'
+import { ref, computed, onMounted } from 'vue';
+import apiClient from '@/api/axios.js';
+import { useModalStore } from '@/stores/modal';
 
-const busqueda = ref('')
-const misTemas = ref([])
-const authStore = useAuthStore()
+const busqueda = ref('');
+const misTemas = ref([]);
+const isLoading = ref(true);
+const modalStore = useModalStore();
 
-onMounted(() => {
-    // 1. Simular que obtenemos el ID del estudiante que ha iniciado sesión
-    const idEstudianteLogueado = authStore.usuario?.id || 8; // Usamos el ID del store o un ID de ejemplo
+async function fetchMisTemas() {
+    isLoading.value = true;
+    try {
+        // Hacemos una única llamada. El backend ya sabe qué estudiante está logueado
+        // gracias al token y nos devolverá solo sus temas.
+        const response = await apiClient.get('/temas');
+        misTemas.value = response.data.data;
+    } catch (error) {
+        console.error("Error al obtener los temas del estudiante:", error);
+        modalStore.showModal({
+            title: 'Error',
+            message: 'No se pudieron cargar tus temas.',
+            type: 'error'
+        });
+    } finally {
+        isLoading.value = false;
+    }
+}
 
-    // 2. Filtrar la lista de temas para mostrar solo los de este estudiante
-    misTemas.value = temas.filter(t => t.idEstudiante === idEstudianteLogueado);
-});
-
+onMounted(fetchMisTemas);
 
 const temasFiltrados = computed(() => {
-    const criterio = busqueda.value.trim().toLowerCase()
-    if (!criterio) return misTemas.value
-
+    if (!busqueda.value.trim()) {
+        return misTemas.value;
+    }
+    const criterio = busqueda.value.trim().toLowerCase();
+    // La API devuelve 'estado_tema', así que filtramos por esa propiedad.
     return misTemas.value.filter(t =>
         t.nombre.toLowerCase().includes(criterio) ||
-        t.estado.toLowerCase().includes(criterio)
-    )
-})
+        t.estado_tema.toLowerCase().includes(criterio)
+    );
+});
 
-// Función para obtener una clase de color para cada estado
+// Función para obtener una clase de color para cada estado.
 const getEstadoClass = (estado) => {
-    switch (estado.toLowerCase()) {
-        case 'aprobado': return 'text-bg-success';
-        case 'reprobado': return 'text-bg-danger';
-        case 'revisado': return 'text-bg-warning';
-        case 'en revision': return 'text-bg-info';
-        case 'pendiente': return 'text-bg-primary';
+    if (!estado) return 'text-bg-secondary';
+    switch (estado) { // La API devuelve los estados en mayúscula.
+        case 'APROBADO': return 'text-bg-success';
+        case 'REPROBADO': return 'text-bg-danger';
+        case 'REVISADO': return 'text-bg-warning';
+        case 'EN REVISION': return 'text-bg-info';
+        case 'PRELIMINAR': return 'text-bg-primary';
         default: return 'text-bg-secondary';
     }
 }
@@ -41,25 +57,30 @@ const getEstadoClass = (estado) => {
 
 <template>
     <section class="container-fluid mt-4">
-        <!-- Encabezado de la página con TÍTULO CORREGIDO -->
         <div class="text-center mb-4">
-            <h2 class="text-dark-emphasis fw-bold mb-0">Temas</h2>
+            <h2 class="text-dark-emphasis fw-bold mb-0">Mis Temas de Grado</h2>
         </div>
 
-        <!-- Barra de Búsqueda -->
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" placeholder="Buscar por nombre de tema o estado..." v-model="busqueda" />
+                    <input type="text" class="form-control" placeholder="Buscar por nombre de tema o estado..."
+                        v-model="busqueda" />
                 </div>
             </div>
         </div>
 
-        <!-- Tabla de temas con estilo mejorado -->
         <div class="card shadow-sm">
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div v-if="isLoading" class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2">Cargando tus temas...</p>
+                </div>
+
+                <div v-else class="table-responsive">
                     <table class="table table-hover table-striped align-middle mb-0">
                         <thead class="table-dark">
                             <tr>
@@ -73,17 +94,17 @@ const getEstadoClass = (estado) => {
                                 <td class="ps-4 fw-semibold">{{ tema.nombre }}</td>
                                 <td class="text-center">
                                     <span class="badge rounded-pill" :class="getEstadoClass(tema.estado)">
-                                        {{ tema.estado.toUpperCase() }}
+                                        {{ tema.estado }}
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                     <router-link :to="{ name: 'ETemaGestionView', params: { id: tema.idTema } }"
+                                    <router-link :to="{ name: 'ETemaGestionView', params: { id: tema.idTema } }"
                                         class="btn btn-sm btn-outline-primary" title="Ver gestión del tema">
                                         <i class="bi bi-clipboard2-data-fill me-1"></i> Gestionar
                                     </router-link>
                                 </td>
                             </tr>
-                             <tr v-if="temasFiltrados.length === 0">
+                            <tr v-if="!isLoading && temasFiltrados.length === 0">
                                 <td colspan="3" class="text-center text-muted p-4">No has registrado ningún tema.</td>
                             </tr>
                         </tbody>

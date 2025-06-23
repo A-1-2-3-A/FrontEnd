@@ -1,29 +1,44 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { temas } from '@/data/temas.js'
+import { ref, computed, onMounted } from 'vue'
+import apiClient from '@/api/axios.js'
 
 const busqueda = ref('')
+const temas = ref([])
+const isLoading = ref(true)
 
-// 1. Filtrar solo los temas aprobados
-const temasAprobados = computed(() => {
-    return temas.filter(tema => tema.estado === 'aprobado');
-});
+// Función para obtener los temas aprobados directamente de la API.
+async function fetchTemasAprobados() {
+    isLoading.value = true;
+    try {
+        // Se llama al endpoint público GET /public/temas-aprobados.
+        // Este endpoint ya devuelve solo los temas aprobados, por lo que no necesitamos filtrar.
+        const response = await apiClient.get('/public/temas-aprobados');
+        temas.value = response.data.data;
+    } catch (error) {
+        console.error("Error al obtener los temas aprobados:", error);
+        // Opcional: podrías mostrar un modal de error aquí.
+    } finally {
+        isLoading.value = false;
+    }
+}
+
+onMounted(fetchTemasAprobados);
 
 // 2. Filtrar la lista de temas aprobados según la búsqueda
 const temasFiltrados = computed(() => {
     const criterio = busqueda.value.trim().toLowerCase()
-    if (!criterio) return temasAprobados.value
-
-    return temasAprobados.value.filter(t =>
+    if (!criterio) {
+        return temas.value
+    }
+    return temas.value.filter(t =>
         t.nombre.toLowerCase().includes(criterio)
     )
 })
 
 // Función para formatear fechas
 const formatearFecha = (fecha) => {
-    if (!fecha) return 'No especificada';
-    // Simulación: en una app real, la fecha de aprobación estaría en los datos del tema
-    return new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+    if (!fecha) return 'No especificada'
+    return new Date(fecha).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 </script>
 
@@ -54,8 +69,6 @@ const formatearFecha = (fecha) => {
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-4" style="width: 70%;">Nombre del Tema</th>
-                                <!-- **NUEVA COLUMNA** -->
-                                <th class="text-center" style="width: 30%;">Fecha de Aprobación</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -63,10 +76,6 @@ const formatearFecha = (fecha) => {
                                 <td class="ps-4">
                                     <span class="text-muted me-3">{{ index + 1 }}.</span>
                                     <span class="fw-medium">{{ tema.nombre }}</span>
-                                </td>
-                                <td class="text-center text-muted small">
-                                    <!-- **NUEVO DATO** -->
-                                    {{ formatearFecha(tema.fechaAprobacion) }}
                                 </td>
                             </tr>
                              <tr v-if="temasFiltrados.length === 0">

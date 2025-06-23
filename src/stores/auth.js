@@ -1,35 +1,36 @@
+// src/stores/auth.js
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import axios from 'axios'
-import router from '@/router' // Importamos el router para redirigir
+import router from '@/router'
 
-// Se define la URL base de la API. En un proyecto real, esto vendría de un archivo .env
-const API_URL = 'http://localhost:3000'
+// 1. IMPORTAMOS NUESTRO CLIENTE DE API CENTRALIZADO
+import apiClient from '@/api/axios';
 
 export const useAuthStore = defineStore('auth', () => {
     // --- STATE ---
-    // Se inicializa el estado intentando cargar los datos desde localStorage
+    // Se inicializa el estado intentando cargar los datos desde localStorage. Esto no cambia.
     const usuario = ref(JSON.parse(localStorage.getItem('usuario')) || null)
     const token = ref(localStorage.getItem('token') || null)
 
     // --- GETTERS ---
-    // Getter para saber si el usuario está autenticado
+    // Estos tampoco necesitan cambios.
     const isAuthenticated = computed(() => !!token.value && !!usuario.value)
-    // Getter para obtener el rol del usuario de forma segura
     const userRole = computed(() => usuario.value?.rol || null)
-    // Getter para obtener el token para las peticiones a la API
     const authToken = computed(() => token.value)
 
     // --- ACTIONS ---
 
     /**
-     * Función para iniciar sesión. Llama a la API, y si es exitoso,
-     * guarda los datos del usuario y el token en el estado y en localStorage.
+     * Función para iniciar sesión.
      */
     async function login(credenciales) {
         try {
-            // Se realiza la petición POST a la API
-            const response = await axios.post(`${API_URL}/usuarios/login`, {
+            // 2. LA MEJORA: Se reemplaza la llamada de 'axios.post' por 'apiClient.post'.
+            // Ahora la llamada se hace a través de nuestra instancia configurada.
+            // La URL es relativa ('/usuarios/login') porque la base ('http://localhost:3000/api')
+            // ya está definida en apiClient.
+            const response = await apiClient.post('/usuarios/login', {
                 usuario: credenciales.usuario,
                 clave: credenciales.clave
             })
@@ -37,35 +38,31 @@ export const useAuthStore = defineStore('auth', () => {
             const userData = response.data.data
             const userToken = response.data.token
 
-            // Si la petición es exitosa, actualizamos el estado
+            // El resto de la lógica es la misma: se actualiza el estado y localStorage.
             usuario.value = userData
             token.value = userToken
-
-            // Guardamos los datos en localStorage para persistir la sesión
             localStorage.setItem('usuario', JSON.stringify(userData))
             localStorage.setItem('token', userToken)
 
-            // Redirigimos al panel correspondiente según el rol
-            switch (userData.rol.toLowerCase()) {
-                case 'director': router.push('/director'); break
-                case 'tribunal': router.push('/tribunal'); break
-                case 'secretario': router.push('/secretario'); break
-                case 'estudiante': router.push('/estudiante'); break
-                default: router.push('/'); // Fallback
+            // Redirección por rol
+            switch (userData.rol) { // No es necesario toLowerCase() si los roles en la BD son consistentes
+                case 'Director': router.push('/director'); break
+                case 'Tribunal': router.push('/tribunal'); break
+                case 'Secretario': router.push('/secretario'); break
+                case 'Estudiante': router.push('/estudiante'); break
+                default: router.push('/');
             }
 
-            return true // Indica que el login fue exitoso
+            return true
         } catch (error) {
             console.error('Error en el inicio de sesión:', error.response?.data?.message || error.message)
-            // Limpiamos cualquier dato residual en caso de error
             logout()
-            return false // Indica que el login falló
+            return false
         }
     }
 
     /**
-     * Función para cerrar sesión. Limpia el estado y localStorage,
-     * y redirige a la página de login.
+     * Función para cerrar sesión. No necesita cambios.
      */
     function logout() {
         usuario.value = null
@@ -75,15 +72,13 @@ export const useAuthStore = defineStore('auth', () => {
         router.push('/login')
     }
 
+    // Funciones y estado que se exponen (sin cambios)
     return {
-        // State
         usuario,
         token,
-        // Getters
         isAuthenticated,
         userRole,
         authToken,
-        // Actions
         login,
         logout
     }

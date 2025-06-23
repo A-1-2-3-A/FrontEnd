@@ -1,16 +1,38 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { usuarios } from '@/data/usuarios.js';
-import { temas } from '@/data/temas.js';
-import { asignacionTribunal } from '@/data/asignacionTribunal.js';
+import apiClient from '@/api/axios.js';
 
 const route = useRoute();
-const tribunalId = parseInt(route.params.id);
+const tribunalId = route.params.id;
 
 // Estados para los datos
 const tribunal = ref(null);
 const temasAsignados = ref([]);
+const isLoading = ref(true);
+
+// Cargar los datos del tribunal y sus temas asignados desde la API.
+async function fetchData() {
+    isLoading.value = true;
+    try {
+        // Usamos Promise.all para realizar ambas llamadas a la API en paralelo.
+        const [tribunalResponse, temasResponse] = await Promise.all([
+            apiClient.get(`/usuarios/${tribunalId}`),
+            apiClient.get(`/asignaciones/tribunal/${tribunalId}`)
+        ]);
+
+        tribunal.value = tribunalResponse.data.data;
+        temasAsignados.value = temasResponse.data.data;
+
+    } catch (error) {
+        console.error("Error al obtener el detalle del tribunal:", error);
+        tribunal.value = null; // Para que la plantilla muestre el error
+    } finally {
+        isLoading.value = false;
+    }
+}
+
+onMounted(fetchData);
 
 // Formateador de fecha para que se vea bien
 const formatearFecha = (fecha) => {
@@ -19,54 +41,39 @@ const formatearFecha = (fecha) => {
     return new Date(fecha).toLocaleDateString('es-ES', opciones);
 };
 
-onMounted(() => {
-    // 1. Obtener los detalles del tribunal seleccionado
-    tribunal.value = usuarios.find(u => u.idUsuario === tribunalId);
-
-    // 2. Encontrar todas las asignaciones para este tribunal
-    const asignaciones = asignacionTribunal.filter(a => a.idTribunal === tribunalId);
-
-    // 3. Para cada asignación, buscar los detalles del tema y del estudiante
-    temasAsignados.value = asignaciones
-        .map(asignacion => {
-            const tema = temas.find(t => t.idTema === asignacion.idTema);
-            if (!tema) return null; // Si no se encuentra el tema, se omite
-
-            const estudiante = usuarios.find(u => u.idUsuario === tema.idEstudiante);
-            
-            // Se omiten los temas en estado 'preliminar'
-            if (tema.estado === 'preliminar') {
-                return null;
-            }
-
-            return {
-                nombre_tema: tema.nombre,
-                estudiante_responsable: estudiante ? `${estudiante.nombres} ${estudiante.primer_apellido}` : 'Desconocido',
-                veredicto: asignacion.veredicto || 'PENDIENTE',
-                fecha_veredicto: asignacion.fecha_veredicto || null
-            };
-        })
-        .filter(tema => tema !== null); // Se eliminan las entradas nulas
-});
+const getVeredictoClass = (veredicto) => {
+    if (!veredicto) return 'bg-secondary';
+    switch (veredicto) {
+        case 'APROBADO': return 'bg-success';
+        case 'REPROBADO': return 'bg-danger';
+        case 'REVISADO': return 'bg-warning text-dark';
+        default: return 'bg-secondary'; // Para 'PENDIENTE'
+    }
+};
 </script>
 
 <template>
     <section class="container mt-4">
-        <div v-if="tribunal">
+        <div v-if="isLoading" class="text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="mt-2">Cargando detalles del tribunal...</p>
+        </div>
+
+        <div v-else-if="tribunal">
             <h2 class="fw-bold mb-4 text-center">Detalle del Tribunal</h2>
 
-            <!-- Información del Tribunal -->
             <div class="card shadow mb-4">
-                <div class="card-header bg-primary text-white fw-bold">Información del Tribunal</div>
+                <div class="card-header bg-primary text-white fw-bold">Información del Docente</div>
                 <div class="card-body px-4 py-3">
-                    <p><strong>Nombre:</strong> {{ tribunal.nombres }} {{ tribunal.primer_apellido }} {{ tribunal.segundo_apellido }}</p>
+                    <p><strong>Nombre:</strong> {{ tribunal.nombres }} {{ tribunal.apellido_primero }} {{
+                        tribunal.apellido_segundo }}</p>
                     <p><strong>Correo:</strong> {{ tribunal.usuario }}</p>
                     <p><strong>Rol:</strong> {{ tribunal.rol }}</p>
-                    <p><strong>Especialidad:</strong> {{ tribunal.especialidad || 'No especificada' }}</p>
                 </div>
             </div>
 
-            <!-- Tabla de Temas Asignados -->
             <div class="card shadow">
                 <div class="card-header bg-secondary text-white fw-bold">Temas Asignados</div>
                 <div class="card-body px-4 py-3">
@@ -81,10 +88,11 @@ onMounted(() => {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="(tema, i) in temasAsignados" :key="i" class="text-center">
-                                    <td>{{ tema.nombre_tema }}</td>
-                                    <td>{{ tema.estudiante_responsable }}</td>
-                                    <td><span class="badge bg-info text-dark">{{ tema.veredicto }}</span></td>
+                                <tr v-for="tema in temasAsignados" :key="tema.idAsignacion" class="text-center">
+                                    <td>{{ tema.nombreTema }}</td>
+                                    <td>{{ tema.nombreEstudiante }}</td>
+                                    <td><span class="badge" :class="getVeredictoClass(tema.mi_veredicto)">{{
+                                        tema.mi_veredicto || 'PENDIENTE' }}</span></td>
                                     <td>{{ formatearFecha(tema.fecha_veredicto) }}</td>
                                 </tr>
                             </tbody>
@@ -96,7 +104,8 @@ onMounted(() => {
                 </div>
             </div>
         </div>
-        <div v-else class="alert alert-danger text-center">
+
+        <div v-else-if="!isLoading" class="alert alert-danger text-center">
             No se pudo encontrar la información del tribunal solicitado.
         </div>
     </section>

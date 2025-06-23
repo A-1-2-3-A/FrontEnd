@@ -19,9 +19,6 @@
             <router-link :to="{ name: 'DTemaView' }" class="nav-link text-white d-flex align-items-center px-3 py-2">
                 <i class="bi bi-collection-fill me-2"></i> Temas
             </router-link>
-            <router-link :to="{ name: 'PublicView' }" class="nav-link text-white d-flex align-items-center px-3 py-2 mt-auto mb-2">
-                <i class="bi bi-box-arrow-left me-2"></i> Salir
-            </router-link>
         </nav>
     </div>
 </template>

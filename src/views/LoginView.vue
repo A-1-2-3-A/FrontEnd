@@ -6,20 +6,26 @@ import { useModalStore } from '@/stores/modal';
 const authStore = useAuthStore();
 const modalStore = useModalStore();
 
-const usuario = ref('');
-const password = ref('');
+const credenciales = ref({
+    usuario: '',
+    clave: ''
+});
 const isLoading = ref(false);
 
+// Función que se ejecuta al enviar el formulario
 async function iniciarSesion() {
     isLoading.value = true;
     
-    const loginExitoso = await authStore.login({
-        usuario: usuario.value,
-        clave: password.value
-    });
+    // Llama a la acción 'login' del authStore, que ahora usa nuestro apiClient.
+    // Toda la lógica de la llamada API, guardado en localStorage y redirección
+    // está encapsulada en el store.
+    const loginExitoso = await authStore.login(credenciales.value);
 
     isLoading.value = false;
 
+    // 5. Si la acción del store devuelve 'false', muestra un modal de error.
+    // La lógica de error (qué mensaje mostrar) también está en el store,
+    // nosotros solo reaccionamos al resultado.
     if (!loginExitoso) {
         modalStore.showModal({
             title: 'Error de Autenticación',
@@ -45,7 +51,7 @@ async function iniciarSesion() {
                             type="text" 
                             class="form-control" 
                             id="usuario" 
-                            v-model="usuario"
+                            v-model="credenciales.usuario"
                             placeholder="usuario@sistemas.edu.bo" 
                             required 
                         />
@@ -59,7 +65,7 @@ async function iniciarSesion() {
                             type="password" 
                             class="form-control" 
                             id="password" 
-                            v-model="password"
+                            v-model="credenciales.clave"
                             placeholder="Ingrese su contraseña" 
                             required 
                         />
