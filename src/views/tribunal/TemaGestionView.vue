@@ -14,46 +14,38 @@ const temaId = parseInt(route.params.id);
 const tema = ref(null);
 const isLoading = ref(true);
 
-// Estado para la UI interactiva
-const revisionSeleccionadaId = ref(null); // ID de la VersionesTema seleccionada
+const revisionSeleccionadaId = ref(null);
 const listaComentarios = ref([]);
 const listaArchivosRetro = ref([]);
 
-// Estado para los formularios
+// Formulario
 const nuevoComentario = ref('');
-const archivosParaSubir = ref(null); // Usamos ref(null) para el input tipo file
+const archivoRetroalimentacion = ref(null); // Archivo seleccionado para adjuntar al veredicto
 const nuevoVeredicto = ref('');
 const nuevasObservaciones = ref('');
 
-// Encuentra la información de la asignación específica de este tribunal para este tema.
 const miAsignacion = computed(() => {
     if (!tema.value) return null;
     const idTribunalLogueado = authStore.usuario?.id;
     return tema.value.revisionesPorTribunal.find(r => r.idTribunal === idTribunalLogueado);
 });
 
-// Devuelve el objeto completo de la revisión (versión) que está seleccionada en el dropdown.
 const revisionVisualizada = computed(() => {
     if (!miAsignacion.value || !revisionSeleccionadaId.value) return null;
     return miAsignacion.value.historialCompleto.find(h => h.id === revisionSeleccionadaId.value);
 });
 
-// Determina si el tribunal puede emitir un veredicto para la versión más reciente.
 const puedeRevisar = computed(() => {
     if (!miAsignacion.value) return false;
     const ultimaRevision = miAsignacion.value.historialCompleto[miAsignacion.value.historialCompleto.length - 1];
-    // Solo se puede revisar la última versión y si su veredicto está PENDIENTE.
     return ultimaRevision && ultimaRevision.veredicto === 'PENDIENTE';
 });
 
-// Carga los datos principales del tema.
 async function fetchTemaDetalle() {
     isLoading.value = true;
     try {
         const response = await apiClient.get(`/temas/${temaId}`);
         tema.value = response.data.data;
-
-        // Al cargar, seleccionamos automáticamente la última versión para visualizar.
         if (miAsignacion.value && miAsignacion.value.historialCompleto.length > 0) {
             const ultimaRevision = miAsignacion.value.historialCompleto[miAsignacion.value.historialCompleto.length - 1];
             revisionSeleccionadaId.value = ultimaRevision.id;
@@ -65,7 +57,6 @@ async function fetchTemaDetalle() {
     }
 }
 
-// Carga los comentarios y archivos de retroalimentación para una versión específica.
 async function fetchRetroalimentacion(idVersionTema) {
     if (!idVersionTema || !miAsignacion.value) return;
     try {
@@ -77,7 +68,6 @@ async function fetchRetroalimentacion(idVersionTema) {
     }
 }
 
-// Envía un nuevo comentario a la API.
 async function enviarComentario() {
     if (!nuevoComentario.value.trim() || !revisionVisualizada.value) return;
     try {
@@ -86,38 +76,16 @@ async function enviarComentario() {
             texto_comentario: nuevoComentario.value
         });
         nuevoComentario.value = '';
-        // Recargamos la retroalimentación para mostrar el nuevo comentario.
         fetchRetroalimentacion(revisionVisualizada.value.id);
     } catch (error) {
         modalStore.showModal({ title: 'Error', message: 'No se pudo enviar el comentario.', type: 'error' });
     }
 }
 
-// Sube un archivo de retroalimentación a la API.
 function handleFileUpload(event) {
-    archivosParaSubir.value = event.target.files[0];
-}
-async function subirArchivo() {
-    if (!archivosParaSubir.value || !revisionVisualizada.value) return;
-
-    const formData = new FormData();
-    formData.append('id_version_tema', revisionVisualizada.value.id);
-    formData.append('archivo_retroalimentacion', archivosParaSubir.value);
-
-    try {
-        await apiClient.post(`/retroalimentaciones/archivo/${miAsignacion.value.idAsignacion}`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        archivosParaSubir.value = null; // Limpiar input
-        document.getElementById('fileInput').value = ''; // Limpiar el campo de archivo visualmente
-        fetchRetroalimentacion(revisionVisualizada.value.id); // Recargar para ver el nuevo archivo
-        modalStore.showModal({ title: 'Éxito', message: 'Archivo subido correctamente.', type: 'success' });
-    } catch (error) {
-        modalStore.showModal({ title: 'Error', message: 'No se pudo subir el archivo.', type: 'error' });
-    }
+    archivoRetroalimentacion.value = event.target.files[0];
 }
 
-// Publica el veredicto y las observaciones finales.
 async function publicarRevision() {
     if (!nuevoVeredicto.value || !puedeRevisar.value) {
         modalStore.showModal({ title: 'Error', message: 'Debe seleccionar un veredicto.', type: 'error' });
@@ -125,28 +93,65 @@ async function publicarRevision() {
     }
     const ultimaRevision = miAsignacion.value.historialCompleto[miAsignacion.value.historialCompleto.length - 1];
 
+    const formData = new FormData();
+    formData.append('veredicto', nuevoVeredicto.value);
+    formData.append('observaciones', nuevasObservaciones.value);
+    if (archivoRetroalimentacion.value) {
+        formData.append('archivo_retroalimentacion', archivoRetroalimentacion.value);
+    }
+
     try {
-        await apiClient.put(`/revisiones/${ultimaRevision.id_revision}/veredicto`, {
-            veredicto: nuevoVeredicto.value,
-            observaciones: nuevasObservaciones.value
+        await apiClient.put(`/revisiones/${ultimaRevision.id_revision}/veredicto`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
         });
         modalStore.showModal({ title: 'Éxito', message: 'Revisión publicada correctamente.', type: 'success' });
-        // Redirigimos de vuelta a la lista de temas del tribunal.
         router.push({ name: 'TTemaView' });
     } catch (error) {
         modalStore.showModal({ title: 'Error', message: 'No se pudo publicar la revisión.', type: 'error' });
     }
 }
 
+// Función de descarga de archivos genérica.
+async function descargarArchivo(ruta, nombreArchivo) {
+    try {
+        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, {
+            responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', nombreArchivo);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        modalStore.showModal({
+            title: 'Error de Descarga',
+            message: 'No se pudo descargar el archivo.',
+            type: 'error'
+        });
+    }
+}
+
 onMounted(fetchTemaDetalle);
 
-// Observa cambios en la versión seleccionada para cargar su retroalimentación.
 watch(revisionSeleccionadaId, (newId) => {
     if (newId) {
         fetchRetroalimentacion(newId);
     }
 });
 
+// Función para dar estilo al badge de veredicto.
+const getVeredictoClass = (veredicto) => {
+    if (!veredicto) return 'bg-secondary';
+    switch (veredicto) {
+        case 'APROBADO': return 'bg-success';
+        case 'REPROBADO': return 'bg-danger';
+        case 'REVISADO': return 'bg-warning text-dark';
+        default: return 'bg-secondary';
+    }
+};
 </script>
 
 <template>
@@ -183,6 +188,10 @@ watch(revisionSeleccionadaId, (newId) => {
                             <div class="archivo-display">
                                 <i class="bi bi-file-earmark-pdf-fill"></i>
                                 <span>{{ revisionVisualizada.documentoEstudiante?.nombre }}</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-auto"
+                                    @click="descargarArchivo(revisionVisualizada.documentoEstudiante.ruta, revisionVisualizada.documentoEstudiante.nombre)">
+                                    Descargar
+                                </button>
                             </div>
                             <div v-if="revisionVisualizada.documentoEstudiante?.comentarios"
                                 class="mt-3 border-top pt-3">
@@ -197,36 +206,45 @@ watch(revisionSeleccionadaId, (newId) => {
                         <div class="card-body">
                             <div class="historial-comentarios mb-3">
                                 <p v-if="listaComentarios.length === 0" class="text-muted text-center">No hay
-                                    comentarios.</p>
-                                <div v-for="c in listaComentarios" :key="c.id" class="comentario">
+                                    comentarios para esta versión.</p>
+                                <div v-else v-for="c in listaComentarios" :key="c.id" class="comentario">
                                     <small class="text-muted">{{ new Date(c.fecha_publicacion).toLocaleString('es-ES')
                                         }}</small>
                                     <p>{{ c.texto_comentario }}</p>
                                 </div>
                             </div>
-                            <div class="input-group">
+                            <div v-if="puedeRevisar" class="input-group">
                                 <input type="text" v-model="nuevoComentario" class="form-control"
-                                    placeholder="Escribir comentario..." @keyup.enter="enviarComentario"
-                                    :disabled="!puedeRevisar">
-                                <button class="btn btn-outline-primary" @click="enviarComentario"
-                                    :disabled="!puedeRevisar">Enviar</button>
+                                    placeholder="Escribir comentario..." @keyup.enter="enviarComentario">
+                                <button class="btn btn-outline-primary" @click="enviarComentario">Enviar</button>
                             </div>
                         </div>
                     </div>
                     <div class="card shadow-sm">
                         <div class="card-header fw-bold">Archivos de Retroalimentación</div>
                         <div class="card-body">
-                            <div class="input-group mb-3">
-                                <input id="fileInput" type="file" class="form-control" @change="handleFileUpload"
-                                    :disabled="!puedeRevisar">
-                                <button class="btn btn-outline-primary" @click="subirArchivo"
-                                    :disabled="!archivosParaSubir">Subir</button>
+                            <div v-if="puedeRevisar" class="mb-3">
+                                <label class="form-label small text-muted">Adjuntar archivo con el veredicto
+                                    (opcional):</label>
+                                <input id="fileInput" type="file" class="form-control" @change="handleFileUpload">
+                                <div v-if="archivoRetroalimentacion" class="alert alert-info p-2 mt-2">
+                                    Seleccionado: {{ archivoRetroalimentacion.name }}
+                                </div>
                             </div>
-                            <p v-if="listaArchivosRetro.length === 0" class="text-muted">No se han subido archivos.</p>
-                            <ul v-else class="list-group">
-                                <li v-for="file in listaArchivosRetro" :key="file.id" class="list-group-item">
-                                    {{ file.nombre }}</li>
-                            </ul>
+
+                            <p v-if="!puedeRevisar && listaArchivosRetro.length === 0" class="text-muted">No se
+                                adjuntaron archivos con el veredicto.</p>
+
+                            <div class="d-flex flex-column gap-2">
+                                <div v-for="file in listaArchivosRetro" :key="file.id" class="archivo-display-retro">
+                                    <i class="bi bi-file-earmark-arrow-down"></i>
+                                    <span class="nombre-archivo">{{ file.nombre }}</span>
+                                    <button class="btn btn-sm btn-outline-secondary ms-auto"
+                                        @click="descargarArchivo(file.archivo_retroalimentacion_ruta, file.nombre)">
+                                        Descargar
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -234,7 +252,7 @@ watch(revisionSeleccionadaId, (newId) => {
                 <div class="col-lg-6">
                     <div class="card shadow-sm h-100" :class="!puedeRevisar ? 'bg-light' : ''">
                         <div class="card-header fw-bold bg-secondary text-white">Veredicto y Observaciones Finales</div>
-                        <div class="card-body">
+                        <div class="card-body p-4">
                             <div v-if="puedeRevisar">
                                 <div class="mb-3">
                                     <label class="form-label fw-semibold">Veredicto:</label>
@@ -252,12 +270,17 @@ watch(revisionSeleccionadaId, (newId) => {
                                 </div>
                             </div>
                             <div v-else
-                                class="text-center text-muted p-4 d-flex align-items-center justify-content-center h-100">
-                                <div>
-                                    <p class="mb-1"><strong>Veredicto Emitido:</strong> {{ revisionVisualizada.veredicto
-                                        }}</p>
-                                    <p><strong>Fecha:</strong> {{ new
-                                        Date(revisionVisualizada.fecha_veredicto).toLocaleDateString('es-ES') }}</p>
+                                class="text-center d-flex flex-column align-items-center justify-content-center h-100">
+                                <h6 class="text-muted mb-2">Veredicto Emitido</h6>
+                                <span class="badge fs-6 px-3 py-2 mb-3"
+                                    :class="getVeredictoClass(revisionVisualizada.veredicto)">
+                                    {{ revisionVisualizada.veredicto }}
+                                </span>
+                                <div class="w-100 mt-3 border-top pt-3">
+                                    <h6 class="text-muted text-start mb-2">Observaciones Guardadas:</h6>
+                                    <p v-if="revisionVisualizada.observaciones" class="text-start text-muted fst-italic"
+                                        style="white-space: pre-wrap;">"{{ revisionVisualizada.observaciones }}"</p>
+                                    <p v-else class="text-start text-muted fst-italic">No se dejaron observaciones.</p>
                                 </div>
                             </div>
                         </div>
@@ -265,13 +288,14 @@ watch(revisionSeleccionadaId, (newId) => {
                 </div>
 
                 <div class="col-12 text-center mt-3">
-                    <button class="btn btn-success px-5" @click="publicarRevision" :disabled="!puedeRevisar">Publicar
-                        Revisión</button>
+                    <button class="btn btn-success btn-lg px-5" @click="publicarRevision" :disabled="!puedeRevisar">
+                        <i class="bi bi-send-check-fill me-2"></i>Publicar Revisión
+                    </button>
                 </div>
             </div>
         </div>
         <div v-else-if="!isLoading" class="alert alert-danger text-center">
-            No se pudo cargar la información de la revisión.
+            No se pudo cargar la información de la revisión o no tiene acceso a este tema.
         </div>
     </section>
 </template>
@@ -309,5 +333,29 @@ watch(revisionSeleccionadaId, (newId) => {
 .comentario:last-child {
     border-bottom: none;
     margin-bottom: 0;
+}
+
+.archivo-display-retro {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem 0.75rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+}
+
+.archivo-display-retro i {
+    font-size: 1.5rem;
+    color: #0d6efd;
+    /* Azul para el ícono de descarga */
+}
+
+.archivo-display-retro .nombre-archivo {
+    font-weight: 500;
+    color: #212529;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 </style>

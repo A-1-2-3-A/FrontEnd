@@ -12,21 +12,18 @@ const temaId = parseInt(route.params.id);
 const isLoading = ref(true);
 const isSaving = ref(false);
 
-// Datos del formulario
 const nombre = ref('');
 const estudianteInfo = ref('');
 const archivoActualNombre = ref('');
 const archivoActualRuta = ref('');
 const nuevoArchivo = ref(null);
 
-// Cargar los datos del tema a modificar.
 async function fetchTemaParaModificar() {
     isLoading.value = true;
     try {
         const response = await apiClient.get(`/temas/${temaId}`);
         const tema = response.data.data;
 
-        // Solo se pueden modificar temas en estado PRELIMINAR.
         if (tema.estado_tema !== 'PRELIMINAR') {
             modalStore.showModal({ title: 'Acción no permitida', message: 'Solo se pueden modificar temas en estado PRELIMINAR.', type: 'error' });
             router.push({ name: 'STemaView' });
@@ -36,13 +33,13 @@ async function fetchTemaParaModificar() {
         nombre.value = tema.nombre;
         estudianteInfo.value = tema.estudiante.nombreCompleto;
 
-        // El nombre del archivo se encuentra en la primera versión del historial.
-        if (tema.revisionesPorTribunal[0]?.historialCompleto[0]?.documentoEstudiante) {
-            archivoActualNombre.value = tema.revisionesPorTribunal[0].historialCompleto[0].documentoEstudiante.nombre;
-            archivoActualRuta.value = tema.revisionesPorTribunal[0].historialCompleto[0].documentoEstudiante.ruta;
+        if (tema.archivoInicial) {
+            archivoActualNombre.value = tema.archivoInicial.nombre;
+            archivoActualRuta.value = tema.archivoInicial.ruta;
+        } else {
+            archivoActualNombre.value = 'No disponible';
+            archivoActualRuta.value = '';
         }
-
-        console.log('archivoActualRuta:', archivoActualRuta.value);
 
     } catch (error) {
         console.error("Error al cargar el tema:", error);
@@ -54,8 +51,6 @@ async function fetchTemaParaModificar() {
 
 onMounted(fetchTemaParaModificar);
 
-
-// Guardar los cambios en la API.
 async function guardarCambios() {
     if (!nombre.value) {
         modalStore.showModal({ title: 'Error', message: 'El nombre del tema es requerido.', type: 'error' });
@@ -64,17 +59,14 @@ async function guardarCambios() {
 
     isSaving.value = true;
 
-    // Usamos FormData porque podríamos estar enviando un archivo.
     const formData = new FormData();
     formData.append('nombre', nombre.value);
 
-    // Solo añadimos el archivo al FormData si el usuario ha seleccionado uno nuevo.
     if (nuevoArchivo.value) {
         formData.append('archivo', nuevoArchivo.value);
     }
 
     try {
-        // Axios permite enviar FormData con el método PUT.
         await apiClient.put(`/temas/${temaId}`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -97,16 +89,36 @@ async function guardarCambios() {
     }
 }
 
-// Función para manejar la selección de un nuevo archivo.
 function handleFileUpload(event) {
     nuevoArchivo.value = event.target.files[0];
 }
 
-function obtenerUrlArchivo(ruta) {
-    if (!ruta) return '';
-    // Usar la dirección y puerto reales
-    return `http://localhost:5050/${ruta.replace(/^\/+/, '')}`;
+// NUEVO: Función para descargar el archivo.
+async function descargarArchivo(ruta, nombreArchivo) {
+    try {
+        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, {
+            responseType: 'blob',
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', nombreArchivo);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Error al descargar el archivo:', error);
+        modalStore.showModal({
+            title: 'Error de Descarga',
+            message: 'No se pudo descargar el archivo. Verifique que exista en el servidor.',
+            type: 'error'
+        });
+    }
 }
+
 </script>
 
 <template>
@@ -134,18 +146,19 @@ function obtenerUrlArchivo(ruta) {
 
                 <div class="mb-3">
                     <label class="form-label">Archivo del Tema (PDF)</label>
-                    <div class="alert alert-info p-2">
-                        <strong>Archivo actual:</strong>
-                        <template v-if="archivoActualRuta">
-                            <a :href="obtenerUrlArchivo(archivoActualRuta)" target="_blank" rel="noopener">
-                                {{ archivoActualNombre || 'Ver archivo' }}
-                            </a>
-                        </template>
-                        <template v-else>
-                            No disponible
-                        </template>
+
+                    <div class="archivo-display" v-if="archivoActualRuta">
+                        <i class="bi bi-file-earmark-pdf-fill"></i>
+                        <span class="nombre-archivo">{{ archivoActualNombre }}</span>
+                        <button type="button" @click="descargarArchivo(archivoActualRuta, archivoActualNombre)"
+                            class="btn btn-sm btn-outline-secondary ms-auto">
+                            Descargar
+                        </button>
                     </div>
-                    <label for="fileUpload" class="form-label text-muted small">Seleccione un nuevo archivo para
+                    <div v-else class="alert alert-warning p-2">
+                        Archivo no disponible
+                    </div>
+                    <label for="fileUpload" class="form-label text-muted small mt-2">Seleccione un nuevo archivo para
                         reemplazar el actual (opcional):</label>
                     <input id="fileUpload" type="file" class="form-control" @change="handleFileUpload" accept=".pdf">
                     <div v-if="nuevoArchivo" class="alert alert-success mt-2 p-2">
@@ -164,3 +177,29 @@ function obtenerUrlArchivo(ruta) {
         </form>
     </section>
 </template>
+
+<style scoped>
+.archivo-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.5rem 0.75rem;
+    background-color: #e9ecef;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+}
+
+.archivo-display i {
+    font-size: 1.5rem;
+    color: #dc3545;
+    /* Rojo para el ícono de PDF */
+}
+
+.archivo-display .nombre-archivo {
+    font-weight: 500;
+    color: #212529;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+</style>

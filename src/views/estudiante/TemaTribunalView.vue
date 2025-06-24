@@ -12,36 +12,37 @@ const tribunalId = parseInt(route.params.id);
 
 const tema = ref(null);
 const isLoading = ref(true);
-const revisionSeleccionadaId = ref(null); // ID de la VersionesTema
-
-/// Retroalimentación de la versión seleccionada
+const revisionSeleccionadaId = ref(null);
 const comentariosTribunal = ref([]);
 const archivosRetroalimentacion = ref([]);
 
-// Formulario para nueva corrección
+// --- INICIO DE LA CORRECCIÓN ---
+// Nuevo estado para controlar si estamos en modo consulta o modo envío.
+const modoEnvio = ref(false);
+// --- FIN DE LA CORRECCIÓN ---
+
 const archivoCorreccion = ref(null);
 const comentariosEstudiante = ref('');
 
-// Encuentra la asignación y el historial correspondientes a este tribunal.
 const miAsignacion = computed(() => {
     if (!tema.value) return null;
     return tema.value.revisionesPorTribunal.find(r => r.idTribunal === tribunalId);
 });
 
-// Devuelve el objeto de la revisión/versión que se está visualizando.
 const revisionVisualizada = computed(() => {
     if (!miAsignacion.value || !revisionSeleccionadaId.value) return null;
     return miAsignacion.value.historialCompleto.find(h => h.id === revisionSeleccionadaId.value);
 });
 
-// Determina si el estudiante debe enviar una nueva versión.
+// Esta lógica ahora se usará para mostrar el botón que activa el "modoEnvio".
 const requiereAccion = computed(() => {
     if (!miAsignacion.value) return false;
-    // La acción es requerida si el último veredicto del tribunal fue 'REVISADO'.
-    return miAsignacion.value.veredictoActual === 'REVISADO';
+    const historial = miAsignacion.value.historialCompleto;
+    if (historial.length === 0) return false;
+    const ultimaRevision = historial[historial.length - 1];
+    return ultimaRevision.veredicto === 'REVISADO';
 });
 
-// Carga los datos principales del tema.
 async function fetchData() {
     isLoading.value = true;
     try {
@@ -59,7 +60,6 @@ async function fetchData() {
     }
 }
 
-// Carga los comentarios y archivos para una versión específica.
 async function fetchRetroalimentacion(idVersion) {
     if (!idVersion || !miAsignacion.value) return;
     try {
@@ -73,7 +73,6 @@ async function fetchRetroalimentacion(idVersion) {
     }
 }
 
-// Función de descarga de archivos.
 async function descargarArchivo(ruta, nombre) {
     try {
         const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, { responseType: 'blob' });
@@ -89,7 +88,6 @@ async function descargarArchivo(ruta, nombre) {
     }
 }
 
-// Lógica para enviar una nueva corrección.
 function handleFileUpload(event) {
     archivoCorreccion.value = event.target.files[0];
 }
@@ -99,18 +97,13 @@ async function enviarCorreccion() {
         modalStore.showModal({ title: 'Error', message: 'Por favor, seleccione un archivo PDF.', type: 'error' });
         return;
     }
-
     const formData = new FormData();
     formData.append('id_asignacion', miAsignacion.value.idAsignacion);
     formData.append('comentarios_estudiante', comentariosEstudiante.value);
     formData.append('archivo', archivoCorreccion.value);
-
     try {
-        await apiClient.post('/versiones', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await apiClient.post('/versiones', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         modalStore.showModal({ title: 'Éxito', message: 'Tu corrección ha sido enviada.', type: 'success' });
-        // Redirigir a la vista general de temas del estudiante.
         router.push({ name: 'ETemaView' });
     } catch (error) {
         modalStore.showModal({ title: 'Error', message: error.response?.data?.message || 'No se pudo enviar la corrección.', type: 'error' });
@@ -120,6 +113,8 @@ async function enviarCorreccion() {
 onMounted(fetchData);
 
 watch(revisionSeleccionadaId, (newId) => {
+    // Si se cambia el selector, siempre volvemos al modo consulta.
+    modoEnvio.value = false;
     if (newId) {
         fetchRetroalimentacion(newId);
     }
@@ -134,11 +129,11 @@ const getVeredictoClass = (veredicto) => {
     }
 };
 </script>
+
 <template>
     <section class="container mt-4">
         <div v-if="isLoading" class="text-center p-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span>
             </div>
             <p class="mt-2">Cargando datos de la revisión...</p>
         </div>
@@ -152,76 +147,41 @@ const getVeredictoClass = (veredicto) => {
                         <span class="fw-semibold">Tribunal:</span> {{ miAsignacion.nombreCompleto }}
                     </div>
                     <div class="col-md-3">
-                        <span class="fw-semibold">Veredicto:</span> <span
-                            :class="getVeredictoClass(revisionVisualizada?.veredicto)">{{ revisionVisualizada?.veredicto
-                            }}</span>
+                        <span class="fw-semibold">Veredicto: </span>
+                        <span :class="getVeredictoClass(revisionVisualizada?.veredicto)">{{
+                            revisionVisualizada?.veredicto }}</span>
                     </div>
                     <div class="col-md-4 d-flex justify-content-center align-items-center">
                         <label for="revisionSelect" class="form-label mb-0 me-2 fw-semibold">Ver Intento:</label>
                         <select id="revisionSelect" class="form-select form-select-sm w-auto"
                             v-model="revisionSeleccionadaId">
-                            <option v-for="r in miAsignacion.historialCompleto" :key="r.id" :value="r.id">
-                                Revisión #{{ r.version }}
-                            </option>
+                            <option v-for="r in miAsignacion.historialCompleto" :key="r.id" :value="r.id">Revisión #{{
+                                r.version }}</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <div v-if="revisionVisualizada" class="row g-4">
+            <div v-if="!modoEnvio && revisionVisualizada" class="row g-4">
                 <div class="col-lg-6 d-flex flex-column gap-4">
                     <div class="card shadow-sm">
                         <div class="card-header fw-bold bg-primary text-white">Mi Envío</div>
                         <div class="card-body">
-                            <label class="form-label fw-semibold">Documento enviado:</label>
                             <div class="archivo-display">
                                 <i class="bi bi-file-earmark-pdf-fill"></i>
                                 <span>{{ revisionVisualizada.documentoEstudiante.nombre }}</span>
-                                <a href="#"
-                                    @click.prevent="descargarArchivo(revisionVisualizada.documentoEstudiante.ruta, revisionVisualizada.documentoEstudiante.nombre)"
-                                    class="btn btn-sm btn-outline-secondary ms-auto">Descargar</a>
+                                <button class="btn btn-sm btn-outline-secondary ms-auto"
+                                    @click="descargarArchivo(revisionVisualizada.documentoEstudiante.ruta, revisionVisualizada.documentoEstudiante.nombre)">Descargar</button>
                             </div>
-
                             <div v-if="revisionVisualizada.documentoEstudiante.comentarios"
                                 class="mt-3 border-top pt-3">
                                 <label class="form-label fw-semibold">Mis Comentarios en este Envío:</label>
                                 <p class="text-muted fst-italic">"{{ revisionVisualizada.documentoEstudiante.comentarios
                                 }}"</p>
                             </div>
-
-                            <div v-if="requiereAccion" class="mt-4 border-top pt-3">
-                                <h6 class="text-success fw-bold">Acción Requerida</h6>
-                                <p class="small text-muted mb-2">El tribunal ha solicitado correcciones. Sube una nueva
-                                    versión de tu documento.</p>
-                                <div class="mb-3">
-                                    <label class="form-label">Archivo Corregido (PDF):</label>
-                                    <input type="file" class="form-control" @change="handleFileUpload" accept=".pdf">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Comentarios para el Tribunal (Opcional):</label>
-                                    <textarea class="form-control" rows="3" v-model="comentariosEstudiante"
-                                        placeholder="Ej: He aplicado las correcciones solicitadas..."></textarea>
-                                </div>
-                                <button class="btn btn-success w-100 mt-2" @click="enviarCorreccion"
-                                    :disabled="!archivoCorreccion">Enviar Corrección</button>
-                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="col-lg-6 d-flex flex-column gap-4">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header fw-bold bg-secondary text-white">Observaciones del Tribunal</div>
-                        <div class="card-body card-body-scrollable">
-                            <p v-if="!revisionVisualizada.observaciones" class="text-muted text-center pt-3">No hay
-                                observaciones.</p>
-                            <p v-else style="white-space: pre-wrap;">{{ revisionVisualizada.observaciones }}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="card shadow-sm h-100">
+                    <div class="card shadow-sm">
                         <div class="card-header fw-bold">Comentarios del Tribunal</div>
                         <div class="card-body card-body-scrollable">
                             <p v-if="!comentariosTribunal.length" class="text-muted text-center pt-3">No hay
@@ -238,26 +198,66 @@ const getVeredictoClass = (veredicto) => {
                     </div>
                 </div>
 
-                <div class="col-md-6">
+                <div class="col-lg-6 d-flex flex-column gap-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header fw-bold bg-secondary text-white">Observaciones del Tribunal</div>
+                        <div class="card-body card-body-scrollable">
+                            <p v-if="!revisionVisualizada.observaciones" class="text-muted text-center pt-3">No hay
+                                observaciones para esta revisión.</p>
+                            <p v-else style="white-space: pre-wrap;">{{ revisionVisualizada.observaciones }}</p>
+                        </div>
+                    </div>
                     <div class="card shadow-sm h-100">
                         <div class="card-header fw-bold">Archivos de Retroalimentación</div>
                         <div class="card-body">
                             <p v-if="!archivosRetroalimentacion.length" class="text-muted text-center pt-3">No hay
                                 archivos.</p>
-                            <ul v-else class="list-unstyled mb-0">
+                            <ul v-else class="list-unstyled mb-0 d-flex flex-column gap-2">
                                 <li v-for="file in archivosRetroalimentacion" :key="file.id"
                                     class="archivo-display-retro">
                                     <i class="bi bi-file-earmark-arrow-down"></i>
                                     <span>{{ file.nombre }}</span>
-                                    <a href="#"
-                                        @click.prevent="descargarArchivo(file.archivo_retroalimentacion_ruta, file.nombre)"
-                                        class="btn btn-sm btn-outline-secondary ms-auto">Descargar</a>
+                                    <button class="btn btn-sm btn-outline-secondary ms-auto"
+                                        @click="descargarArchivo(file.archivo_retroalimentacion_ruta, file.nombre)">Descargar</button>
                                 </li>
                             </ul>
                         </div>
                     </div>
                 </div>
+
+                <div v-if="requiereAccion" class="col-12 text-center mt-4">
+                    <button @click="modoEnvio = true" class="btn btn-success btn-lg px-5">
+                        <i class="bi bi-upload me-2"></i>Subir Nueva Corrección
+                    </button>
+                </div>
             </div>
+
+            <div v-else-if="modoEnvio">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white fw-bold">
+                        Enviar Corrección (Intento #{{ miAsignacion.historialCompleto.length + 1 }})
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted mb-3">Sube la nueva versión de tu documento con las correcciones
+                            solicitadas por el tribunal.</p>
+                        <div class="mb-3">
+                            <label class="form-label">Archivo Corregido (PDF):</label>
+                            <input type="file" class="form-control" @change="handleFileUpload" accept=".pdf" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Comentarios para el Tribunal (Opcional):</label>
+                            <textarea class="form-control" rows="4" v-model="comentariosEstudiante"
+                                placeholder="Ej: He aplicado las correcciones solicitadas en la página 5 y 12..."></textarea>
+                        </div>
+                        <div class="d-flex justify-content-center gap-3 mt-4">
+                            <button class="btn btn-secondary" @click="modoEnvio = false">Cancelar</button>
+                            <button class="btn btn-primary" @click="enviarCorreccion"
+                                :disabled="!archivoCorreccion">Enviar Corrección</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
         <div v-else-if="!isLoading" class="alert alert-danger text-center">
             No se pudo encontrar la información de la revisión.
@@ -276,7 +276,8 @@ const getVeredictoClass = (veredicto) => {
     padding: 0.4em 0.8em;
 }
 
-.archivo-display {
+.archivo-display,
+.archivo-display-retro {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -286,16 +287,14 @@ const getVeredictoClass = (veredicto) => {
     border-radius: 5px;
 }
 
-.archivo-display-retro {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-bottom: 1px solid #eee;
+.archivo-display i {
+    font-size: 1.5rem;
+    color: #dc3545;
 }
 
-.archivo-display-retro:last-child {
-    border-bottom: none;
+.archivo-display-retro i {
+    font-size: 1.5rem;
+    color: #0d6efd;
 }
 
 .card-body-scrollable {
