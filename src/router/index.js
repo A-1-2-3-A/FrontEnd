@@ -22,6 +22,7 @@ import DDesTribunalView from '@/views/director/DesTribunalView.vue'
 import DTribunalDetalleView from '@/views/director/TribunalDetalleView.vue'
 import DTemaView from '@/views/director/TemaView.vue'
 import DTemaDetalleView from '@/views/director/TemaDetalleView.vue'
+import DEspecialidadView from '@/views/director/EspecialidadView.vue'
 
 import TPrincipalView from '@/views/tribunal/PrincipalView.vue'
 import TPerfilView from '@/views/tribunal/PerfilView.vue'
@@ -131,6 +132,12 @@ const router = createRouter({
                     name: 'DTemaDetalleView',
                     component: DTemaDetalleView,
                     props: true
+                },
+                {
+                    path: 'especialidades', // URL más limpia
+                    name: 'DEspecialidadView',
+                    component: DEspecialidadView,
+                    meta: { roles: ['Director', 'Secretario'] }
                 },
             ],
         },
@@ -246,24 +253,24 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  // Obtenemos el store de autenticación
-  const authStore = useAuthStore();
+    // Obtenemos el store de autenticación
+    const authStore = useAuthStore();
 
-  // Lista de rutas que NO requieren autenticación
-  const rutasPublicas = ['PublicView', 'LoginView', 'TribunalView', 'TemaView'];
+    // Lista de rutas que NO requieren autenticación
+    const rutasPublicas = ['PublicView', 'LoginView', 'TribunalView', 'TemaView'];
 
-  // Verificamos si la ruta a la que se intenta acceder es protegida
-  const esRutaProtegida = !rutasPublicas.includes(to.name);
+    // Verificamos si la ruta a la que se intenta acceder es protegida
+    const esRutaProtegida = !rutasPublicas.includes(to.name);
 
-  // SI la ruta es protegida Y el usuario NO está autenticado...
-  if (esRutaProtegida && !authStore.isAuthenticated) {
-    // ...lo redirigimos a la página de login.
-    next({ name: 'LoginView' });
-  } else {
-    // En cualquier otro caso (ruta pública, o ruta protegida con usuario autenticado),
-    // permitimos que la navegación continúe.
-    next();
-  }
+    // SI la ruta es protegida Y el usuario NO está autenticado...
+    if (esRutaProtegida && !authStore.isAuthenticated) {
+        // ...lo redirigimos a la página de login.
+        next({ name: 'LoginView' });
+    } else {
+        // En cualquier otro caso (ruta pública, o ruta protegida con usuario autenticado),
+        // permitimos que la navegación continúe.
+        next();
+    }
 });
 
 export default router

@@ -16,10 +16,8 @@ const revisionSeleccionadaId = ref(null);
 const comentariosTribunal = ref([]);
 const archivosRetroalimentacion = ref([]);
 
-// --- INICIO DE LA CORRECCIÓN ---
 // Nuevo estado para controlar si estamos en modo consulta o modo envío.
 const modoEnvio = ref(false);
-// --- FIN DE LA CORRECCIÓN ---
 
 const archivoCorreccion = ref(null);
 const comentariosEstudiante = ref('');
@@ -73,18 +71,29 @@ async function fetchRetroalimentacion(idVersion) {
     }
 }
 
-async function descargarArchivo(ruta, nombre) {
+async function descargarArchivo(idArchivo, nombreArchivo) {
+    // Si no se proporciona un ID de archivo, no hacer nada.
+    if (!idArchivo) return;
+
     try {
-        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, { responseType: 'blob' });
+        // La llamada ahora es a la nueva ruta segura, pasando el ID del archivo.
+        const response = await apiClient.get(`/archivos/retroalimentacion/${idArchivo}`, {
+            responseType: 'blob'
+        });
+
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', nombre);
+        link.setAttribute('download', nombreArchivo);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     } catch (error) {
-        modalStore.showModal({ title: 'Error', message: 'No se pudo descargar el archivo.', type: 'error' });
+        // El error 403 (Acceso Denegado) será manejado por el interceptor, que cierra la sesión.
+        // Para otros errores, mostramos el modal.
+        if (error.response?.status !== 403) {
+            modalStore.showModal({ title: 'Error', message: 'No se pudo descargar el archivo.', type: 'error' });
+        }
     }
 }
 
@@ -177,7 +186,7 @@ const getVeredictoClass = (veredicto) => {
                                 class="mt-3 border-top pt-3">
                                 <label class="form-label fw-semibold">Mis Comentarios en este Envío:</label>
                                 <p class="text-muted fst-italic">"{{ revisionVisualizada.documentoEstudiante.comentarios
-                                }}"</p>
+                                    }}"</p>
                             </div>
                         </div>
                     </div>
@@ -218,7 +227,9 @@ const getVeredictoClass = (veredicto) => {
                                     <i class="bi bi-file-earmark-arrow-down"></i>
                                     <span>{{ file.nombre }}</span>
                                     <button class="btn btn-sm btn-outline-secondary ms-auto"
-                                        @click="descargarArchivo(file.archivo_retroalimentacion_ruta, file.nombre)">Descargar</button>
+                                        @click="descargarArchivo(file.id, file.nombre)">
+                                        Descargar
+                                    </button>
                                 </li>
                             </ul>
                         </div>

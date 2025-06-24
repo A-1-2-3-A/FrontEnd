@@ -144,10 +144,15 @@ function toggleTribunal(id) {
 
                             <div>
                                 <span class="fw-semibold">{{ t.apellido_primero }} {{ t.apellido_segundo }},</span> {{
-                                    t.nombres }}
+                                t.nombres }}
                                 <br>
                                 <small class="text-muted">Especialidades: {{ t.especialidades || 'No definidas'
                                     }}</small>
+
+                                <br>
+                                <span class="fw-bold small">Temas Asignados:
+                                    <span class="badge bg-info rounded-pill">{{ t.temas_asignados }}</span>
+                                </span>
                             </div>
 
                             <div class="text-end">
@@ -173,7 +178,6 @@ function toggleTribunal(id) {
         </div>
     </section>
 </template>
-
 
 <style scoped>
 .tribunal-list {

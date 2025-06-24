@@ -52,10 +52,6 @@ const tribunalesFiltrados = computed(() => {
         <div class="card shadow-sm">
             <div class="card-body p-0">
                 <div v-if="isLoading" class="text-center p-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <p class="mt-2">Cargando tribunales...</p>
                 </div>
 
                 <div v-else class="table-responsive">
@@ -64,18 +60,17 @@ const tribunalesFiltrados = computed(() => {
                             <tr class="text-center">
                                 <th>Nombre Completo</th>
                                 <th>Especialidades</th>
+                                <th>Temas Asignados</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="tribunal in tribunalesFiltrados" :key="tribunal.id">
-                                <td>
-                                    <div class="px-3">
-                                        {{ tribunal.apellido_primero }} {{ tribunal.apellido_segundo }}, {{
-                                        tribunal.nombres }}
-                                    </div>
+                                <td class="text-start ps-4">
+                                    {{ tribunal.apellido_primero }} {{ tribunal.apellido_segundo }}, {{ tribunal.nombres
+                                    }}
                                 </td>
-                                <td class="text-center">
+                                <td>
                                     <div class="d-flex flex-wrap justify-content-center gap-2">
                                         <template v-if="tribunal.especialidades">
                                             <span v-for="especialidad in tribunal.especialidades.split(', ')"
@@ -87,6 +82,9 @@ const tribunalesFiltrados = computed(() => {
                                         <span v-else class="text-muted small">No asignadas</span>
                                     </div>
                                 </td>
+                                <td class="text-center fw-bold">
+                                    {{ tribunal.temas_asignados }}
+                                </td>
                                 <td class="text-center">
                                     <router-link :to="{ name: 'DTribunalDetalleView', params: { id: tribunal.id } }"
                                         class="btn btn-sm btn-outline-info" title="Ver detalle del tribunal">
@@ -95,7 +93,7 @@ const tribunalesFiltrados = computed(() => {
                                 </td>
                             </tr>
                             <tr v-if="!isLoading && tribunalesFiltrados.length === 0">
-                                <td colspan="3" class="text-center text-muted p-4">No se encontraron tribunales.</td>
+                                <td colspan="4" class="text-center text-muted p-4">No se encontraron tribunales.</td>
                             </tr>
                         </tbody>
                     </table>

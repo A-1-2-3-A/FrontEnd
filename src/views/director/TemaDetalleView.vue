@@ -12,11 +12,9 @@ const tema = ref(null);
 const isLoading = ref(true);
 const historialVisiblePara = ref(null);
 
-// 1. Cargar el detalle completo del tema desde la API.
 async function fetchTemaDetalle() {
     isLoading.value = true;
     try {
-        // Hacemos una única llamada a la API que ya nos devuelve los datos estructurados.
         const response = await apiClient.get(`/temas/${temaId}`);
         tema.value = response.data.data;
     } catch (error) {
@@ -33,13 +31,11 @@ async function fetchTemaDetalle() {
 
 onMounted(fetchTemaDetalle);
 
-
-// 2. Función de descarga de archivos, ahora usando apiClient.
-async function descargarArchivo(ruta, nombreArchivo) {
+async function descargarArchivo(idVersion, nombreArchivo) {
     try {
-        // apiClient ya incluye el token de autorización automáticamente.
-        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, {
-            responseType: 'blob', // Importante para manejar la descarga de archivos.
+        // Llama a la nueva ruta segura para administradores
+        const response = await apiClient.get(`/archivos/tema-version/admin/${idVersion}`, {
+            responseType: 'blob',
         });
 
         const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -61,7 +57,6 @@ async function descargarArchivo(ruta, nombreArchivo) {
     }
 }
 
-// --- FUNCIONES AUXILIARES (sin cambios) ---
 function toggleHistorial(idTribunal) {
     historialVisiblePara.value = historialVisiblePara.value === idTribunal ? null : idTribunal;
 }
@@ -72,7 +67,7 @@ const getVeredictoClass = (veredicto) => {
         case 'APROBADO': return 'bg-success';
         case 'REPROBADO': return 'bg-danger';
         case 'REVISADO': return 'bg-warning text-dark';
-        default: return 'bg-secondary'; // Para 'PENDIENTE'
+        default: return 'bg-secondary';
     }
 };
 
@@ -127,7 +122,7 @@ const formatearFecha = (fecha) => {
                                 <tr>
                                     <td>{{ revision.nombreCompleto }}</td>
                                     <td><span class="badge" :class="getVeredictoClass(revision.veredictoActual)">{{
-                                            revision.veredictoActual || 'PENDIENTE' }}</span></td>
+                                        revision.veredictoActual || 'PENDIENTE' }}</span></td>
                                     <td>{{ formatearFecha(revision.fechaUltimoVeredicto) }}</td>
                                     <td>
                                         <button class="btn btn-sm btn-outline-info"
@@ -146,12 +141,13 @@ const formatearFecha = (fecha) => {
                                                 <div class="d-flex justify-content-between align-items-center">
                                                     <div>
                                                         <strong>Versión #{{ h.version }}:</strong> Veredicto de "{{
-                                                        h.veredicto }}"
+                                                            h.veredicto }}"
                                                         <br>
                                                         <small class="text-muted">
-                                                            Archivo Revisado:
+                                                            {{ h.veredicto === 'PENDIENTE' ? 'Archivo Enviado:' :
+                                                                'Archivo Revisado:' }}
                                                             <a href="#"
-                                                                @click.prevent="descargarArchivo(h.documentoEstudiante.ruta, h.documentoEstudiante.nombre)"
+                                                                @click.prevent="descargarArchivo(h.id, h.documentoEstudiante.nombre)"
                                                                 class="file-download-link">
                                                                 {{ h.documentoEstudiante.nombre }}
                                                             </a>

@@ -12,23 +12,27 @@ const idUsuario = route.params.id;
 const usuario = ref(null);
 const isLoading = ref(true);
 const especialidadesDisponibles = ref([]);
+const errores = ref({});
 
-
-// Cargar los datos iniciales (del usuario y de las especialidades).
 async function fetchData() {
     isLoading.value = true;
     try {
-        // Hacemos las dos llamadas en paralelo para mayor eficiencia.
         const [resUsuario, resEspecialidades] = await Promise.all([
             apiClient.get(`/usuarios/${idUsuario}`),
             apiClient.get('/especialidades')
         ]);
 
         usuario.value = resUsuario.data.data;
-        especialidadesDisponibles.value = resEspecialidades.data.data;
 
-        // El backend devuelve las especialidades del usuario como un array de IDs.
-        // Nos aseguramos de que sea un array vacío si viene como null.
+        // Se formatea la fecha de nacimiento al formato YYYY-MM-DD
+        if (usuario.value && usuario.value.fecha_nacimiento) {
+            const fecha = new Date(usuario.value.fecha_nacimiento);
+            const anio = fecha.getFullYear();
+            const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
+            const dia = fecha.getDate().toString().padStart(2, '0');
+            usuario.value.fecha_nacimiento = `${anio}-${mes}-${dia}`;
+        }
+
         if (usuario.value && !Array.isArray(usuario.value.especialidades)) {
             usuario.value.especialidades = [];
         }
@@ -40,7 +44,7 @@ async function fetchData() {
             message: 'No se pudieron cargar los datos del usuario.',
             type: 'error'
         });
-        usuario.value = null; // Para que la plantilla muestre el mensaje de error.
+        usuario.value = null;
     } finally {
         isLoading.value = false;
     }
@@ -48,24 +52,74 @@ async function fetchData() {
 
 onMounted(fetchData);
 
-// Lógica para guardar los cambios en la API.
+function validarFormulario() {
+    errores.value = {};
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+
+    // Validación de Nombres
+    if (!usuario.value.nombres.trim()) {
+        errores.value.nombres = 'El nombre es obligatorio.';
+    } else if (usuario.value.nombres.startsWith(' ')) {
+        errores.value.nombres = 'El nombre no puede empezar con espacios.';
+    } else if (!nameRegex.test(usuario.value.nombres)) {
+        errores.value.nombres = 'El nombre solo puede contener letras y espacios.';
+    }
+
+    // Validación de Primer Apellido
+    if (!usuario.value.apellido_primero.trim()) {
+        errores.value.apellido_primero = 'El primer apellido es obligatorio.';
+    } else if (usuario.value.apellido_primero.startsWith(' ')) {
+        errores.value.apellido_primero = 'El apellido no puede empezar con espacios.';
+    } else if (!nameRegex.test(usuario.value.apellido_primero)) {
+        errores.value.apellido_primero = 'El apellido solo puede contener letras y espacios.';
+    }
+
+    // Validación de Segundo Apellido
+    if (usuario.value.apellido_segundo && !nameRegex.test(usuario.value.apellido_segundo)) {
+        errores.value.apellido_segundo = 'El apellido solo puede contener letras y espacios.';
+    }
+    if (usuario.value.apellido_segundo && usuario.value.apellido_segundo.startsWith(' ')) {
+        errores.value.apellido_segundo = 'El apellido no puede empezar con espacios.';
+    }
+
+    // Validación de Fecha de Nacimiento
+    if (usuario.value.fecha_nacimiento) {
+        const hoy = new Date();
+        const fechaNac = new Date(usuario.value.fecha_nacimiento);
+        let edad = hoy.getFullYear() - fechaNac.getFullYear();
+        const m = hoy.getMonth() - fechaNac.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < fechaNac.getDate())) {
+            edad--;
+        }
+        if (edad < 5 || edad > 125) {
+            errores.value.fecha_nacimiento = 'La edad debe estar entre 5 y 125 años.';
+        }
+    }
+
+    return Object.keys(errores.value).length === 0;
+}
+
 async function guardarCambios() {
     if (!usuario.value) return;
+
+    if (!validarFormulario()) {
+        modalStore.showModal({
+            title: 'Datos Inválidos',
+            message: 'Por favor, corrija los errores marcados en el formulario.',
+            type: 'error'
+        });
+        return;
+    }
+
     isLoading.value = true;
-
     try {
-        // Llamada PUT a la API. El objeto 'usuario.value' ya contiene todos los
-        // datos actualizados gracias al v-model en la plantilla.
         await apiClient.put(`/usuarios/${idUsuario}`, usuario.value);
-
         modalStore.showModal({
             title: 'Éxito',
             message: 'Usuario actualizado correctamente.',
             type: 'success'
         });
-
         router.push({ name: 'DUsuarioView' });
-
     } catch (error) {
         const mensajeError = error.response?.data?.message || 'Ocurrió un error al actualizar el usuario.';
         modalStore.showModal({
@@ -73,15 +127,14 @@ async function guardarCambios() {
             message: mensajeError,
             type: 'error'
         });
-        console.error("Error al actualizar usuario:", error);
     } finally {
         isLoading.value = false;
     }
 }
 
-// Propiedad computada para deshabilitar el cambio de rol (lógica sin cambios).
 const puedeCambiarRol = computed(() => {
     if (!usuario.value) return false;
+    // El Director puede cambiar el rol si es Director o Tribunal.
     return ['Director', 'Tribunal'].includes(usuario.value.rol);
 });
 </script>
@@ -104,28 +157,46 @@ const puedeCambiarRol = computed(() => {
                 <div class="card-body p-4">
                     <div class="mb-3">
                         <label class="form-label">Nombres</label>
-                        <input type="text" v-model="usuario.nombres" class="form-control" required />
+                        <input type="text" v-model="usuario.nombres" class="form-control"
+                            :class="{ 'is-invalid': errores.nombres }" required />
+                        <div v-if="errores.nombres" class="invalid-feedback">{{ errores.nombres }}</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Primer Apellido</label>
-                        <input type="text" v-model="usuario.apellido_primero" class="form-control" required />
+                        <input type="text" v-model="usuario.apellido_primero" class="form-control"
+                            :class="{ 'is-invalid': errores.apellido_primero }" required />
+                        <div v-if="errores.apellido_primero" class="invalid-feedback">{{ errores.apellido_primero }}
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Segundo Apellido</label>
-                        <input type="text" v-model="usuario.apellido_segundo" class="form-control" />
+                        <input type="text" v-model="usuario.apellido_segundo" class="form-control"
+                            :class="{ 'is-invalid': errores.apellido_segundo }" />
+                        <div v-if="errores.apellido_segundo" class="invalid-feedback">{{ errores.apellido_segundo }}
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Correo Electrónico</label>
-                        <input type="email" v-model="usuario.usuario" class="form-control" disabled readonly />
+                        <input type="email" :value="usuario.usuario" class="form-control" disabled readonly />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="fechaNacimiento" class="form-label">Fecha de Nacimiento</label>
+                        <input id="fechaNacimiento" type="date" v-model="usuario.fecha_nacimiento" class="form-control"
+                            :class="{ 'is-invalid': errores.fecha_nacimiento }" />
+                        <div v-if="errores.fecha_nacimiento" class="invalid-feedback">{{ errores.fecha_nacimiento }}
+                        </div>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Rol</label>
                         <select v-model="usuario.rol" class="form-select" :disabled="!puedeCambiarRol">
-                            <option value="Director">Director</option>
-                            <option value="Tribunal">Tribunal</option>
-                            <option value="Secretario">Secretario</option>
-                            <option value="Estudiante">Estudiante</option>
+                            <option v-if="usuario.rol === 'Director' || usuario.rol === 'Tribunal'" value="Director">
+                                Director</option>
+                            <option v-if="usuario.rol === 'Director' || usuario.rol === 'Tribunal'" value="Tribunal">
+                                Tribunal</option>
+                            <option v-if="usuario.rol === 'Secretario'" value="Secretario">Secretario</option>
+                            <option v-if="usuario.rol === 'Estudiante'" value="Estudiante">Estudiante</option>
                         </select>
                         <small v-if="!puedeCambiarRol" class="form-text text-muted">El rol no se puede
                             modificar.</small>

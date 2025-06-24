@@ -14,9 +14,11 @@ const isSaving = ref(false);
 
 const nombre = ref('');
 const estudianteInfo = ref('');
-const archivoActualNombre = ref('');
-const archivoActualRuta = ref('');
 const nuevoArchivo = ref(null);
+
+// Refs para almacenar los datos del archivo actual
+const archivoActualId = ref(null);
+const archivoActualNombre = ref('');
 
 async function fetchTemaParaModificar() {
     isLoading.value = true;
@@ -24,6 +26,7 @@ async function fetchTemaParaModificar() {
         const response = await apiClient.get(`/temas/${temaId}`);
         const tema = response.data.data;
 
+        // Solo se pueden modificar temas en estado preliminar
         if (tema.estado_tema !== 'PRELIMINAR') {
             modalStore.showModal({ title: 'Acción no permitida', message: 'Solo se pueden modificar temas en estado PRELIMINAR.', type: 'error' });
             router.push({ name: 'STemaView' });
@@ -33,12 +36,10 @@ async function fetchTemaParaModificar() {
         nombre.value = tema.nombre;
         estudianteInfo.value = tema.estudiante.nombreCompleto;
 
+        // Se guardan los datos del archivo inicial, incluyendo su ID
         if (tema.archivoInicial) {
+            archivoActualId.value = tema.archivoInicial.id;
             archivoActualNombre.value = tema.archivoInicial.nombre;
-            archivoActualRuta.value = tema.archivoInicial.ruta;
-        } else {
-            archivoActualNombre.value = 'No disponible';
-            archivoActualRuta.value = '';
         }
 
     } catch (error) {
@@ -50,6 +51,33 @@ async function fetchTemaParaModificar() {
 }
 
 onMounted(fetchTemaParaModificar);
+
+// Función de descarga segura que usa el ID del archivo
+async function descargarArchivo() {
+    if (!archivoActualId.value) return;
+
+    try {
+        const response = await apiClient.get(`/archivos/tema-version/admin/${archivoActualId.value}`, {
+            responseType: 'blob',
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', archivoActualNombre.value);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        modalStore.showModal({
+            title: 'Error de Descarga',
+            message: 'No se pudo descargar el archivo. Verifique que exista en el servidor.',
+            type: 'error'
+        });
+    }
+}
 
 async function guardarCambios() {
     if (!nombre.value) {
@@ -90,35 +118,17 @@ async function guardarCambios() {
 }
 
 function handleFileUpload(event) {
-    nuevoArchivo.value = event.target.files[0];
-}
-
-// NUEVO: Función para descargar el archivo.
-async function descargarArchivo(ruta, nombreArchivo) {
-    try {
-        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, {
-            responseType: 'blob',
-        });
-
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', nombreArchivo);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-        console.error('Error al descargar el archivo:', error);
-        modalStore.showModal({
-            title: 'Error de Descarga',
-            message: 'No se pudo descargar el archivo. Verifique que exista en el servidor.',
-            type: 'error'
-        });
+    const file = event.target.files[0];
+    if (file && file.type === "application/pdf") {
+        nuevoArchivo.value = file;
+    } else {
+        if (file) { // Solo mostrar modal si se seleccionó un archivo no válido
+            modalStore.showModal({ title: 'Archivo no válido', message: 'Por favor, seleccione un archivo PDF.', type: 'warning' });
+        }
+        event.target.value = '';
+        nuevoArchivo.value = null;
     }
 }
-
 </script>
 
 <template>
@@ -147,10 +157,10 @@ async function descargarArchivo(ruta, nombreArchivo) {
                 <div class="mb-3">
                     <label class="form-label">Archivo del Tema (PDF)</label>
 
-                    <div class="archivo-display" v-if="archivoActualRuta">
+                    <div class="archivo-display" v-if="archivoActualId">
                         <i class="bi bi-file-earmark-pdf-fill"></i>
                         <span class="nombre-archivo">{{ archivoActualNombre }}</span>
-                        <button type="button" @click="descargarArchivo(archivoActualRuta, archivoActualNombre)"
+                        <button type="button" @click="descargarArchivo"
                             class="btn btn-sm btn-outline-secondary ms-auto">
                             Descargar
                         </button>
@@ -158,6 +168,7 @@ async function descargarArchivo(ruta, nombreArchivo) {
                     <div v-else class="alert alert-warning p-2">
                         Archivo no disponible
                     </div>
+
                     <label for="fileUpload" class="form-label text-muted small mt-2">Seleccione un nuevo archivo para
                         reemplazar el actual (opcional):</label>
                     <input id="fileUpload" type="file" class="form-control" @change="handleFileUpload" accept=".pdf">

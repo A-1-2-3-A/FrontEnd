@@ -37,6 +37,7 @@ async function cambiarEstadoUsuario(usuario) {
 
     try {
         await apiClient.patch(`/usuarios/${usuario.id}/estado`, { estado: nuevoEstado });
+        // Actualizamos el estado localmente para reflejar el cambio al instante.
         usuario.estado = nuevoEstado;
         modalStore.showModal({ title: 'Éxito', message: `Usuario ${accion}do correctamente.`, type: 'success' });
     } catch (error) {
@@ -44,11 +45,18 @@ async function cambiarEstadoUsuario(usuario) {
     }
 }
 
+// Lógica de filtrado que se conserva
 const usuariosFiltrados = computed(() => {
-    if (!busqueda.value.trim()) return usuarios.value;
+    // Se filtran los roles que el Secretario no debe ver
+    let usuariosPermitidos = usuarios.value.filter(u => u.rol !== 'Director' && u.rol !== 'Secretario');
+
+    if (!busqueda.value.trim()) {
+        return usuariosPermitidos;
+    }
+
     const criterio = busqueda.value.trim().toLowerCase();
-    return usuarios.value.filter(usuario =>
-        `${usuario.nombres} ${usuario.apellido_primero} ${usuario.apellido_segundo}`.toLowerCase().includes(criterio) ||
+    return usuariosPermitidos.filter(usuario =>
+        `${usuario.nombres} ${usuario.apellido_primero} ${usuario.apellido_segundo || ''}`.toLowerCase().includes(criterio) ||
         usuario.usuario.toLowerCase().includes(criterio) ||
         usuario.rol.toLowerCase().includes(criterio)
     );
@@ -56,15 +64,12 @@ const usuariosFiltrados = computed(() => {
 
 const getRolClass = (rol) => {
     switch (rol.toLowerCase()) {
-        case 'director': return 'text-bg-danger';
-        case 'secretario': return 'text-bg-info';
         case 'tribunal': return 'text-bg-warning';
         case 'estudiante': return 'text-bg-success';
         default: return 'text-bg-secondary';
     }
 }
 
-// CORRECCIÓN CLAVE: Esta función ahora apunta a la ruta de añadir del Secretario
 const irAAgregar = () => {
     router.push({ name: 'SUsuarioAdicionarView' });
 }
@@ -72,7 +77,7 @@ const irAAgregar = () => {
 
 <template>
     <section class="container-fluid mt-4">
-                <div class="text-center mb-4">
+        <div class="text-center mb-4">
             <h2 class="text-dark-emphasis fw-bold mb-0">Gestión de Usuarios</h2>
         </div>
 
@@ -93,37 +98,44 @@ const irAAgregar = () => {
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Cargando...</span>
                     </div>
-                    <p class="mt-2">Cargando usuarios...</p>
                 </div>
 
                 <div v-else class="table-responsive">
                     <table class="table table-hover table-striped align-middle mb-0">
                         <thead class="table-dark">
-                            <tr class="text-center">
-                                <th>Nombre Completo</th>
+                            <tr>
+                                <th class="ps-4">Nombre Completo</th>
                                 <th>Rol</th>
                                 <th>Correo Electrónico</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="usuario in usuariosFiltrados" :key="usuario.id">
-                                <td class="text-center">{{ usuario.apellido_primero }} {{ usuario.apellido_segundo }}, {{ usuario.nombres }}</td>
-                                <td class="text-center"><span class="badge rounded-pill" :class="getRolClass(usuario.rol)">{{ usuario.rol }}</span></td>
-                                <td class="text-center">{{ usuario.usuario }}</td>
-                                <td class="text-center"><span class="badge" :class="usuario.estado ? 'text-bg-success' : 'text-bg-danger'">{{ usuario.estado ? 'Activo' : 'Inactivo' }}</span></td>
+                                <td class="ps-4">{{ usuario.apellido_primero }} {{ usuario.apellido_segundo || '' }}, {{
+                                    usuario.nombres }}</td>
+                                <td>
+                                    <span class="badge rounded-pill" :class="getRolClass(usuario.rol)">
+                                        {{ usuario.rol }}
+                                    </span>
+                                </td>
+                                <td>{{ usuario.usuario }}</td>
                                 <td class="text-center">
-                                    <div class="btn-group" role="group">
-                                                                                <router-link
-                                            :to="{ name: 'SUsuarioModificarView', params: { id: usuario.id } }"
-                                            class="btn btn-sm btn-outline-primary" title="Modificar">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </router-link>
-                                        <button @click="cambiarEstadoUsuario(usuario)" class="btn btn-sm btn-outline-danger" title="Habilitar/Inhabilitar">
-                                            <i :class="usuario.estado ? 'bi bi-slash-circle-fill' : 'bi bi-check-circle-fill'"></i>
-                                        </button>
-                                    </div>
+                                    <span class="badge" :class="usuario.estado ? 'text-bg-success' : 'text-bg-danger'">
+                                        {{ usuario.estado ? 'Activo' : 'Inactivo' }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <router-link :to="{ name: 'SUsuarioModificarView', params: { id: usuario.id } }"
+                                        class="btn btn-sm btn-outline-primary me-2" title="Modificar">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </router-link>
+                                    <button @click="cambiarEstadoUsuario(usuario)" class="btn btn-sm btn-outline-danger"
+                                        :title="usuario.estado ? 'Inhabilitar' : 'Habilitar'">
+                                        <i
+                                            :class="usuario.estado ? 'bi bi-slash-circle-fill' : 'bi bi-check-circle-fill'"></i>
+                                    </button>
                                 </td>
                             </tr>
                             <tr v-if="!isLoading && usuariosFiltrados.length === 0">

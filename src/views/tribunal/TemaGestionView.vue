@@ -35,10 +35,10 @@ const revisionVisualizada = computed(() => {
     return miAsignacion.value.historialCompleto.find(h => h.id === revisionSeleccionadaId.value);
 });
 
+// La lógica ahora es más simple y correcta. Un tribunal puede revisar si
+// la versión que está viendo actualmente tiene el estado 'PENDIENTE'.
 const puedeRevisar = computed(() => {
-    if (!miAsignacion.value) return false;
-    const ultimaRevision = miAsignacion.value.historialCompleto[miAsignacion.value.historialCompleto.length - 1];
-    return ultimaRevision && ultimaRevision.veredicto === 'PENDIENTE';
+    return revisionVisualizada.value && revisionVisualizada.value.veredicto === 'PENDIENTE';
 });
 
 async function fetchTemaDetalle() {
@@ -111,26 +111,30 @@ async function publicarRevision() {
     }
 }
 
-// Función de descarga de archivos genérica.
-async function descargarArchivo(ruta, nombreArchivo) {
+// La función descargarArchivo ahora es un despachador que decide qué ruta llamar.
+async function descargarArchivo(tipo, id, nombre) {
+    let url = '';
+    if (tipo === 'temaEstudiante') {
+        url = `/archivos/tema-version/${id}`;
+    } else if (tipo === 'retroalimentacion') {
+        url = `/archivos/retroalimentacion/tribunal/${id}`;
+    } else {
+        return; // No hacer nada si el tipo es desconocido
+    }
+
     try {
-        const response = await apiClient.get(`/archivos/descargar?ruta=${ruta}`, {
-            responseType: 'blob',
-        });
-        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const response = await apiClient.get(url, { responseType: 'blob' });
+        const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', nombreArchivo);
+        link.href = blobUrl;
+        link.setAttribute('download', nombre);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
     } catch (error) {
-        modalStore.showModal({
-            title: 'Error de Descarga',
-            message: 'No se pudo descargar el archivo.',
-            type: 'error'
-        });
+        if (error.response?.status !== 403) {
+            modalStore.showModal({ title: 'Error de Descarga', message: 'No se pudo descargar el archivo.', type: 'error' });
+        }
     }
 }
 
@@ -189,7 +193,7 @@ const getVeredictoClass = (veredicto) => {
                                 <i class="bi bi-file-earmark-pdf-fill"></i>
                                 <span>{{ revisionVisualizada.documentoEstudiante?.nombre }}</span>
                                 <button class="btn btn-sm btn-outline-secondary ms-auto"
-                                    @click="descargarArchivo(revisionVisualizada.documentoEstudiante.ruta, revisionVisualizada.documentoEstudiante.nombre)">
+                                    @click="descargarArchivo('temaEstudiante', revisionVisualizada.id, revisionVisualizada.documentoEstudiante.nombre)">
                                     Descargar
                                 </button>
                             </div>
@@ -206,7 +210,7 @@ const getVeredictoClass = (veredicto) => {
                         <div class="card-body">
                             <div class="historial-comentarios mb-3">
                                 <p v-if="listaComentarios.length === 0" class="text-muted text-center">No hay
-                                    comentarios para esta versión.</p>
+                                    comentarios.</p>
                                 <div v-else v-for="c in listaComentarios" :key="c.id" class="comentario">
                                     <small class="text-muted">{{ new Date(c.fecha_publicacion).toLocaleString('es-ES')
                                         }}</small>
@@ -227,24 +231,21 @@ const getVeredictoClass = (veredicto) => {
                                 <label class="form-label small text-muted">Adjuntar archivo con el veredicto
                                     (opcional):</label>
                                 <input id="fileInput" type="file" class="form-control" @change="handleFileUpload">
-                                <div v-if="archivoRetroalimentacion" class="alert alert-info p-2 mt-2">
-                                    Seleccionado: {{ archivoRetroalimentacion.name }}
-                                </div>
                             </div>
-
-                            <p v-if="!puedeRevisar && listaArchivosRetro.length === 0" class="text-muted">No se
-                                adjuntaron archivos con el veredicto.</p>
-
-                            <div class="d-flex flex-column gap-2">
-                                <div v-for="file in listaArchivosRetro" :key="file.id" class="archivo-display-retro">
-                                    <i class="bi bi-file-earmark-arrow-down"></i>
-                                    <span class="nombre-archivo">{{ file.nombre }}</span>
-                                    <button class="btn btn-sm btn-outline-secondary ms-auto"
-                                        @click="descargarArchivo(file.archivo_retroalimentacion_ruta, file.nombre)">
-                                        Descargar
-                                    </button>
-                                </div>
-                            </div>
+                            <p v-if="listaArchivosRetro.length === 0" class="text-muted">No se han subido archivos para
+                                esta versión.</p>
+                            <ul v-else class="list-group list-group-flush">
+                                <li v-for="file in listaArchivosRetro" :key="file.id" class="list-group-item ps-0 pe-0">
+                                    <div class="archivo-display-retro">
+                                        <i class="bi bi-file-earmark-arrow-down"></i>
+                                        <span class="nombre-archivo">{{ file.nombre }}</span>
+                                        <button class="btn btn-sm btn-outline-secondary ms-auto"
+                                            @click="descargarArchivo('retroalimentacion', file.id, file.nombre)">
+                                            Descargar
+                                        </button>
+                                    </div>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -287,15 +288,16 @@ const getVeredictoClass = (veredicto) => {
                     </div>
                 </div>
 
-                <div class="col-12 text-center mt-3">
-                    <button class="btn btn-success btn-lg px-5" @click="publicarRevision" :disabled="!puedeRevisar">
+                <div v-if="puedeRevisar" class="col-12 text-center mt-3">
+                    <button class="btn btn-success btn-lg px-5" @click="publicarRevision">
                         <i class="bi bi-send-check-fill me-2"></i>Publicar Revisión
                     </button>
                 </div>
+
             </div>
         </div>
         <div v-else-if="!isLoading" class="alert alert-danger text-center">
-            No se pudo cargar la información de la revisión o no tiene acceso a este tema.
+            No se pudo cargar la información de la revisión.
         </div>
     </section>
 </template>
