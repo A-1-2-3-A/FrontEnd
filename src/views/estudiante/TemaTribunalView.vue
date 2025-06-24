@@ -71,28 +71,34 @@ async function fetchRetroalimentacion(idVersion) {
     }
 }
 
-async function descargarArchivo(idArchivo, nombreArchivo) {
-    // Si no se proporciona un ID de archivo, no hacer nada.
-    if (!idArchivo) return;
+async function descargarArchivo(tipo, id, nombre) {
+    let url = '';
+
+    // Se definen las URLs correctas para cada tipo de descarga
+    if (tipo === 'documentoEstudiante') {
+        // Un estudiante puede descargar su propio documento. Usamos la ruta de admin por simplicidad,
+        // asumiendo que el backend podría necesitar una ruta específica para estudiante en el futuro.
+        // Por ahora, crearemos una ruta segura para que el estudiante descargue su propio archivo.
+        url = `/archivos/tema-version/estudiante/${id}`; // Se asume que esta ruta se creará
+    } else if (tipo === 'retroalimentacionTribunal') {
+        // Se corrige la URL para que coincida con la ruta del backend
+        url = `/archivos/retroalimentacion/estudiante/${id}`;
+    } else {
+        return;
+    }
 
     try {
-        // La llamada ahora es a la nueva ruta segura, pasando el ID del archivo.
-        const response = await apiClient.get(`/archivos/retroalimentacion/${idArchivo}`, {
-            responseType: 'blob'
-        });
-
-        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const response = await apiClient.get(url, { responseType: 'blob' });
+        const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', nombreArchivo);
+        link.href = blobUrl;
+        link.setAttribute('download', nombre);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     } catch (error) {
-        // El error 403 (Acceso Denegado) será manejado por el interceptor, que cierra la sesión.
-        // Para otros errores, mostramos el modal.
         if (error.response?.status !== 403) {
-            modalStore.showModal({ title: 'Error', message: 'No se pudo descargar el archivo.', type: 'error' });
+            modalStore.showModal({ title: 'Error de Descarga', message: 'No se pudo descargar el archivo.', type: 'error' });
         }
     }
 }
@@ -142,7 +148,8 @@ const getVeredictoClass = (veredicto) => {
 <template>
     <section class="container mt-4">
         <div v-if="isLoading" class="text-center p-5">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span>
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
             </div>
             <p class="mt-2">Cargando datos de la revisión...</p>
         </div>
@@ -156,16 +163,18 @@ const getVeredictoClass = (veredicto) => {
                         <span class="fw-semibold">Tribunal:</span> {{ miAsignacion.nombreCompleto }}
                     </div>
                     <div class="col-md-3">
-                        <span class="fw-semibold">Veredicto: </span>
-                        <span :class="getVeredictoClass(revisionVisualizada?.veredicto)">{{
-                            revisionVisualizada?.veredicto }}</span>
+                        <span class="fw-semibold">Veredicto:</span>
+                        <span :class="getVeredictoClass(revisionVisualizada?.veredicto)">
+                            {{ revisionVisualizada?.veredicto }}
+                        </span>
                     </div>
                     <div class="col-md-4 d-flex justify-content-center align-items-center">
                         <label for="revisionSelect" class="form-label mb-0 me-2 fw-semibold">Ver Intento:</label>
                         <select id="revisionSelect" class="form-select form-select-sm w-auto"
                             v-model="revisionSeleccionadaId">
-                            <option v-for="r in miAsignacion.historialCompleto" :key="r.id" :value="r.id">Revisión #{{
-                                r.version }}</option>
+                            <option v-for="r in miAsignacion.historialCompleto" :key="r.id" :value="r.id">
+                                Revisión #{{ r.version }}
+                            </option>
                         </select>
                     </div>
                 </div>
@@ -180,7 +189,9 @@ const getVeredictoClass = (veredicto) => {
                                 <i class="bi bi-file-earmark-pdf-fill"></i>
                                 <span>{{ revisionVisualizada.documentoEstudiante.nombre }}</span>
                                 <button class="btn btn-sm btn-outline-secondary ms-auto"
-                                    @click="descargarArchivo(revisionVisualizada.documentoEstudiante.ruta, revisionVisualizada.documentoEstudiante.nombre)">Descargar</button>
+                                    @click="descargarArchivo('documentoEstudiante', revisionVisualizada.id, revisionVisualizada.documentoEstudiante.nombre)">
+                                    Descargar
+                                </button>
                             </div>
                             <div v-if="revisionVisualizada.documentoEstudiante.comentarios"
                                 class="mt-3 border-top pt-3">
@@ -227,7 +238,7 @@ const getVeredictoClass = (veredicto) => {
                                     <i class="bi bi-file-earmark-arrow-down"></i>
                                     <span>{{ file.nombre }}</span>
                                     <button class="btn btn-sm btn-outline-secondary ms-auto"
-                                        @click="descargarArchivo(file.id, file.nombre)">
+                                        @click="descargarArchivo('retroalimentacionTribunal', file.id, file.nombre)">
                                         Descargar
                                     </button>
                                 </li>
